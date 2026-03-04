@@ -1,20 +1,33 @@
-<div align="center">
-<img width="1200" height="475" alt="GHBanner" src="https://github.com/user-attachments/assets/0aa67016-6eaf-458a-adb2-6e31a0763ed6" />
-</div>
+# Ponto CLT - Full Stack (Neon + Cloudflare)
 
-# Run and deploy your AI Studio app
+Este projeto foi preparado para deploy no **Cloudflare Pages** com banco de dados **Neon (PostgreSQL)**.
 
-This contains everything you need to run your app locally.
+## 🚀 Como subir para o GitHub e Deploy
 
-View your app in AI Studio: https://ai.studio/apps/71ad363e-3fca-435b-b22c-a78a6a71de25
+### 1. Preparação do Banco de Dados (Neon)
+1. Crie uma conta no [Neon.tech](https://neon.tech).
+2. Crie um novo projeto e copie a **Connection String** (DATABASE_URL).
+3. No seu terminal local, execute as migrações para criar as tabelas:
+   ```bash
+   npx drizzle-kit push
+   ```
 
-## Run Locally
+### 2. Deploy no Cloudflare Pages
+1. Conecte seu repositório GitHub ao Cloudflare Pages.
+2. Configure o build:
+   - **Framework preset**: `None` (ou `Vite` se preferir, mas usaremos um comando customizado).
+   - **Build command**: `npm run build`
+   - **Build output directory**: `dist`
+3. **Variáveis de Ambiente**:
+   - Adicione `DATABASE_URL` com o valor obtido no Neon.
+   - Certifique-se de habilitar o "Node.js compatibility" nas configurações do projeto no Cloudflare.
 
-**Prerequisites:**  Node.js
+### 3. Estrutura do Projeto
+- `server.ts`: Servidor Express que gerencia a API e serve o frontend.
+- `src/db/schema.ts`: Definição das tabelas usando Drizzle ORM.
+- `src/db/index.ts`: Conexão com o Neon.
 
-
-1. Install dependencies:
-   `npm install`
-2. Set the `GEMINI_API_KEY` in [.env.local](.env.local) to your Gemini API key
-3. Run the app:
-   `npm run dev`
+## 🛠️ Desenvolvimento Local
+1. Instale as dependências: `npm install`
+2. Crie um arquivo `.env` baseado no `.env.example` e adicione sua `DATABASE_URL`.
+3. Inicie o servidor: `npm run dev`
