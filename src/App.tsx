@@ -66,6 +66,7 @@ export default function App() {
   const [activeTab, setActiveTab] = useState<'history' | 'calendar' | 'stats'>('history');
   const [previousBalance, setPreviousBalance] = useState(0);
   const [loading, setLoading] = useState(true);
+  const [isSyncingCompany, setIsSyncingCompany] = useState(false);
 
   // Form state
   const [formData, setFormData] = useState<TimeEntry>({
@@ -181,6 +182,26 @@ export default function App() {
     }
   };
 
+  const syncCompanyPonto = async () => {
+    setIsSyncingCompany(true);
+    try {
+      const response = await fetch('/api/sync-ponto-empresa', { method: 'POST' });
+      const data = await response.json();
+      
+      if (data.success) {
+        alert(`${data.count} dias foram sincronizados do site da empresa!`);
+        fetchData(); // Atualiza a tela com os novos dados
+      } else {
+        alert('Erro ao puxar dados da empresa: ' + data.error);
+      }
+    } catch (err) {
+      console.error('Erro na requisição:', err);
+      alert('Erro de conexão ao tentar sincronizar com a empresa.');
+    } finally {
+      setIsSyncingCompany(false);
+    }
+  };
+
   const getDayStatus = (dateStr: string) => {
     const date = new Date(dateStr + 'T00:00:00');
     const isWeekend = date.getDay() === 0 || date.getDay() === 6;
@@ -259,19 +280,31 @@ export default function App() {
           </div>
 
           <div className="flex items-center gap-6 bg-white/5 p-4 rounded-3xl border border-white/10 backdrop-blur-md">
-            <div className="text-right">
+            <div className="text-right hidden sm:block">
               <p className="text-3xl font-mono font-medium text-emerald-400">
                 {currentTime.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
               </p>
               <p className="text-xs text-zinc-500 uppercase tracking-widest">Brasília, DF</p>
             </div>
-            <button 
-              onClick={openNewEntryModal}
-              className="bg-emerald-500 hover:bg-emerald-400 text-black px-6 py-3 rounded-2xl font-bold transition-all flex items-center gap-2 shadow-xl shadow-emerald-500/20 active:scale-95"
-            >
-              <Plus className="w-5 h-5" />
-              BATER PONTO
-            </button>
+            
+            <div className="flex flex-col gap-2">
+              <button 
+                onClick={syncCompanyPonto}
+                disabled={isSyncingCompany}
+                className="bg-indigo-600 hover:bg-indigo-500 text-white px-6 py-2 rounded-xl font-bold transition-all flex items-center justify-center gap-2 text-sm shadow-lg shadow-indigo-500/20 active:scale-95 disabled:opacity-50"
+              >
+                <Activity className="w-4 h-4" />
+                {isSyncingCompany ? 'PUXANDO DADOS...' : 'SYNC EMPRESA'}
+              </button>
+              
+              <button 
+                onClick={openNewEntryModal}
+                className="bg-emerald-500 hover:bg-emerald-400 text-black px-6 py-2 rounded-xl font-bold transition-all flex items-center justify-center gap-2 text-sm shadow-lg shadow-emerald-500/20 active:scale-95"
+              >
+                <Plus className="w-4 h-4" />
+                PONTO MANUAL
+              </button>
+            </div>
           </div>
         </header>
 
