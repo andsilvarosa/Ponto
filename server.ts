@@ -7,13 +7,74 @@ import { eq, desc } from "drizzle-orm";
 import dotenv from "dotenv";
 import * as cheerio from 'cheerio';
 
+import { sql } from "drizzle-orm";
+
 dotenv.config();
 
 async function startServer() {
   console.log("Iniciando startServer...");
   console.log("DATABASE_URL presente:", !!process.env.DATABASE_URL);
+  
   const app = express();
   const PORT = 3000;
+
+  // Request logger
+  app.use((req, res, next) => {
+    console.log(`${req.method} ${req.url}`);
+    next();
+  });
+
+  // Middleware para garantir que o banco está pronto e as tabelas existem
+  const initDb = async () => {
+    if (!process.env.DATABASE_URL) return;
+    try {
+      console.log("Verificando/Criando tabelas no banco...");
+      
+      // Criar tabela de feriados
+      await db.execute(sql`
+        CREATE TABLE IF NOT EXISTS holidays (
+          date TEXT PRIMARY KEY,
+          name TEXT NOT NULL,
+          type TEXT DEFAULT 'national'
+        )
+      `);
+
+      // Criar tabela de marcações (com todas as colunas)
+      await db.execute(sql`
+        CREATE TABLE IF NOT EXISTS time_entries (
+          date TEXT PRIMARY KEY,
+          entry_1 TEXT, exit_1 TEXT,
+          entry_2 TEXT, exit_2 TEXT,
+          entry_3 TEXT, exit_3 TEXT,
+          entry_4 TEXT, exit_4 TEXT,
+          entry_5 TEXT, exit_5 TEXT,
+          created_at TIMESTAMP DEFAULT NOW()
+        )
+      `);
+
+      // Garantir que as colunas novas existam (caso a tabela já existisse sem elas)
+      const columns = ['entry_3', 'exit_3', 'entry_4', 'exit_4', 'entry_5', 'exit_5'];
+      for (const col of columns) {
+        try {
+          await db.execute(sql.raw(`ALTER TABLE time_entries ADD COLUMN IF NOT EXISTS ${col} TEXT`));
+        } catch (e) { /* Coluna já existe */ }
+      }
+
+      // Criar tabela de configurações
+      await db.execute(sql`
+        CREATE TABLE IF NOT EXISTS settings (
+          key TEXT PRIMARY KEY,
+          value TEXT NOT NULL
+        )
+      `);
+
+      console.log("Banco de dados inicializado com sucesso.");
+    } catch (error) {
+      console.error("Erro ao inicializar banco de dados:", error);
+    }
+  };
+
+  await initDb();
 
   app.use(express.json());
 
@@ -236,9 +297,10 @@ async function startServer() {
       const mapaMarcacoes: Map<string, any> = new Map();
 
       // 3. Extrair os dados (Lógica flexível para layouts verticais ou horizontais)
-      // Procuramos em todas as linhas de todas as tabelas
+      console.log("Iniciando varredura de linhas para extração...");
       $('tr').each((index, element) => {
-        const textoLinha = $(element).text().trim();
+        const textoLinha = $(element).text().replace(/\s+/g, ' ').trim();
+        if (index < 20) console.log(`Linha ${index} texto: "${textoLinha}"`);
         
         // Tenta encontrar uma data no formato DD/MM/YYYY na linha
         const matchData = textoLinha.match(/(\d{2}\/\d{2}\/\d{4})/);
