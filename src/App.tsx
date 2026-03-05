@@ -95,6 +95,14 @@ export default function App() {
         fetch('/api/entries'),
         fetch('/api/settings')
       ]);
+      
+      if (!entriesRes.ok || !settingsRes.ok) {
+        const status = !entriesRes.ok ? entriesRes.status : settingsRes.status;
+        const errText = await (entriesRes.ok ? settingsRes.text() : entriesRes.text());
+        console.error(`Erro na resposta do servidor (Status ${status}):`, errText);
+        throw new Error(`Erro ao buscar dados do servidor: Status ${status}`);
+      }
+
       const entriesData = await entriesRes.json();
       const settingsData = await settingsRes.json();
       
@@ -111,31 +119,41 @@ export default function App() {
   const handleSaveSettings = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
-      await fetch('/api/settings', {
+      const response = await fetch('/api/settings', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ previous_balance: previousBalance }),
       });
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Erro ao salvar configurações');
+      }
       setIsSettingsOpen(false);
       fetchData();
-    } catch (err) {
+    } catch (err: any) {
       console.error('Erro ao salvar configurações:', err);
+      alert(err.message || 'Erro ao salvar configurações');
     }
   };
 
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
-      await fetch('/api/entries', {
+      const response = await fetch('/api/entries', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(formData),
       });
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Erro ao salvar marcação');
+      }
       setIsModalOpen(false);
       setIsEditing(false);
       fetchData();
-    } catch (err) {
+    } catch (err: any) {
       console.error('Erro ao salvar:', err);
+      alert(err.message || 'Erro ao salvar marcação');
     }
   };
 
@@ -186,6 +204,14 @@ export default function App() {
     setIsSyncingCompany(true);
     try {
       const response = await fetch('/api/sync-ponto-empresa', { method: 'POST' });
+      
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error(`Erro na sincronização (Status ${response.status}):`, errorText);
+        alert(`Erro ao sincronizar: Status ${response.status}. Verifique os logs do console.`);
+        throw new Error(`O servidor retornou um erro: ${response.status}`);
+      }
+
       const data = await response.json();
       
       if (data.success) {
@@ -194,9 +220,9 @@ export default function App() {
       } else {
         alert('Erro ao puxar dados da empresa: ' + data.error);
       }
-    } catch (err) {
+    } catch (err: any) {
       console.error('Erro na requisição:', err);
-      alert('Erro de conexão ao tentar sincronizar com a empresa.');
+      alert('Erro ao sincronizar: ' + err.message);
     } finally {
       setIsSyncingCompany(false);
     }

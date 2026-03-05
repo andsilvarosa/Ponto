@@ -10,6 +10,8 @@ import * as cheerio from 'cheerio';
 dotenv.config();
 
 async function startServer() {
+  console.log("Iniciando startServer...");
+  console.log("DATABASE_URL presente:", !!process.env.DATABASE_URL);
   const app = express();
   const PORT = 3000;
 
@@ -18,12 +20,23 @@ async function startServer() {
   // Middleware para verificar se o banco está configurado
   const checkDb = (req: express.Request, res: express.Response, next: express.NextFunction) => {
     if (!process.env.DATABASE_URL) {
+      console.error("ERRO: DATABASE_URL não está definida nas variáveis de ambiente.");
       return res.status(500).json({ 
         error: "DATABASE_URL não configurada. Por favor, configure a variável de ambiente no Neon." 
       });
     }
     next();
   };
+
+  // API: Health Check
+  app.get("/api/health", (req, res) => {
+    res.json({ 
+      status: "ok", 
+      database: !!process.env.DATABASE_URL,
+      node_env: process.env.NODE_ENV,
+      time: new Date().toISOString()
+    });
+  });
 
   // API: Configurações
   app.get("/api/settings", checkDb, async (req, res) => {
@@ -105,16 +118,18 @@ async function startServer() {
   app.post("/api/entries", checkDb, async (req, res) => {
     try {
       const data = req.body;
+      console.log("Recebendo nova marcação para salvar:", data.date);
       await db.insert(timeEntries)
         .values(data)
         .onConflictDoUpdate({
           target: timeEntries.date,
           set: data
         });
+      console.log("Marcação salva com sucesso:", data.date);
       res.json({ success: true });
     } catch (error) {
-      console.error(error);
-      res.status(500).json({ error: "Erro ao salvar marcação" });
+      console.error("Erro ao salvar marcação no banco:", error);
+      res.status(500).json({ error: "Erro ao salvar marcação no banco de dados. Verifique se o banco está configurado corretamente." });
     }
   });
 
@@ -129,15 +144,38 @@ async function startServer() {
   });
 
   // API: Sincronizar Ponto da Empresa (Scraping ASP.NET)
-  app.post("/api/sync-ponto-empresa", checkDb, async (req, res) => {
+  app.get("/api/sync-ponto-empresa", (req, res) => {
+    console.log("GET /api/sync-ponto-empresa chamado");
+    res.json({ message: "O endpoint de sincronização está ativo. Use POST para iniciar a sincronização." });
+  });
+
+  app.post("/api/sync-ponto-empresa", async (req, res) => {
+    console.log("POST /api/sync-ponto-empresa chamado");
     try {
+      // Verifica banco manualmente dentro da rota para isolar o problema
+      if (!process.env.DATABASE_URL) {
+        console.error("DATABASE_URL ausente no POST sync");
+        return res.status(500).json({ error: "DATABASE_URL não configurada." });
+      }
+      
       const matricula = '109194'; // Sua matrícula fixa
       const url = 'https://webapp.confianca.com.br/consultaponto/ponto.aspx';
 
       console.log("Iniciando sincronização com a empresa...");
 
       // 1. GET: Pegar os tokens de segurança do ASP.NET
-      const initialResponse = await fetch(url);
+      console.log(`Fazendo GET em ${url}...`);
+      const initialResponse = await fetch(url, {
+        headers: {
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+        },
+        signal: AbortSignal.timeout(10000) // 10s timeout
+      });
+      
+      if (!initialResponse.ok) {
+        throw new Error(`O site da empresa retornou status ${initialResponse.status} no GET inicial.`);
+      }
+
       const initialHtml = await initialResponse.text();
       const $initial = cheerio.load(initialHtml);
 
@@ -145,8 +183,11 @@ async function startServer() {
       const viewStateGenerator = $initial('input[name="__VIEWSTATEGENERATOR"]').val() as string;
       const eventValidation = $initial('input[name="__EVENTVALIDATION"]').val() as string;
 
+      console.log("Tokens capturados:", { viewState: !!viewState, viewStateGenerator: !!viewStateGenerator, eventValidation: !!eventValidation });
+
       if (!viewState) {
-        return res.status(500).json({ error: "Falha ao capturar o ViewState do site da empresa." });
+        console.log("HTML inicial recebido (primeiros 500 chars):", initialHtml.substring(0, 500));
+        return res.status(500).json({ error: "Falha ao capturar o ViewState do site da empresa. O site pode estar fora do ar ou bloqueando o acesso." });
       }
 
       // 2. POST: Simular o preenchimento e clique no botão
@@ -158,64 +199,103 @@ async function startServer() {
       formData.append('txtMatricula', matricula);
       formData.append('btnConsultar', 'Consultar');
 
+      console.log(`Fazendo POST em ${url} para matrícula ${matricula}...`);
       const postResponse = await fetch(url, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/x-www-form-urlencoded',
           'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
         },
-        body: formData.toString()
+        body: formData.toString(),
+        signal: AbortSignal.timeout(15000) // 15s timeout
       });
+
+      if (!postResponse.ok) {
+        throw new Error(`O site da empresa retornou status ${postResponse.status} no POST de consulta.`);
+      }
 
       const finalHtml = await postResponse.text();
       const $ = cheerio.load(finalHtml);
       
       const marcacoesSalvas: any[] = [];
 
-      // 3. Extrair os dados da tabela
-      // Dica Sênior: Se o site quebrar, geralmente é porque o layout da tabela deles mudou.
-      $('table tr').each((index, element) => {
-        // Pula a primeira linha (cabeçalho da tabela)
-        if (index === 0) return;
+      console.log("HTML final recebido, iniciando extração...");
+      
+      let dataAtual: string | null = null;
+      let punchesDoDia: string[] = [];
+      const mapaMarcacoes: Map<string, any> = new Map();
 
-        const colunas = $(element).find('td');
+      // 3. Extrair os dados (Lógica flexível para layouts verticais ou horizontais)
+      // Procuramos em todas as linhas de todas as tabelas
+      $('tr').each((index, element) => {
+        const textoLinha = $(element).text().trim();
         
-        // Verifica se a linha tem colunas suficientes para ser uma linha de ponto
-        if (colunas.length >= 3) { 
-          const dataTexto = $(colunas[0]).text().trim(); // Esperado: "DD/MM/YYYY"
+        // Tenta encontrar uma data no formato DD/MM/YYYY na linha
+        const matchData = textoLinha.match(/(\d{2}\/\d{2}\/\d{4})/);
+        
+        if (matchData) {
+          // Se achamos uma nova data, salvamos a anterior se existir
+          if (dataAtual && punchesDoDia.length > 0) {
+            mapaMarcacoes.set(dataAtual, [...punchesDoDia]);
+          }
           
-          // Validação se a primeira coluna é realmente uma data
-          if (!dataTexto.match(/^\d{2}\/\d{2}\/\d{4}$/)) return; 
-          
-          // Converte de DD/MM/YYYY para YYYY-MM-DD para o nosso banco de dados
-          const [dia, mes, ano] = dataTexto.split('/');
-          const dateIso = `${ano}-${mes}-${dia}`;
+          const [dia, mes, ano] = matchData[1].split('/');
+          dataAtual = `${ano}-${mes}-${dia}`;
+          punchesDoDia = [];
+          console.log(`Data detectada: ${matchData[1]} -> ${dataAtual}`);
+        }
 
-          // Mapeia as colunas do site para o nosso formato
-          // Atenção: Ajuste os índices (1, 2, 3...) de acordo com a ordem real da tabela deles
-          const marcacao = {
-            date: dateIso,
-            entry_1: $(colunas[1]).text().trim() || '',
-            exit_1: $(colunas[2]).text().trim() || '',
-            entry_2: $(colunas[3]).text().trim() || '',
-            exit_2: $(colunas[4]).text().trim() || '',
-            entry_3: $(colunas[5]) ? $(colunas[5]).text().trim() : '',
-            exit_3: $(colunas[6]) ? $(colunas[6]).text().trim() : '',
-            entry_4: '', exit_4: '', entry_5: '', exit_5: ''
-          };
-
-          marcacoesSalvas.push(marcacao);
+        // Tenta encontrar todos os horários (HH:MM) na linha
+        // O regex garante que pegamos apenas horários válidos
+        const matchesHorario = textoLinha.match(/([012]\d:[0-5]\d)/g);
+        if (matchesHorario && dataAtual) {
+          matchesHorario.forEach(h => {
+            // Evita duplicados na mesma linha (comum em alguns layouts de ASP.NET)
+            if (!punchesDoDia.includes(h)) {
+              punchesDoDia.push(h);
+              console.log(`Horário detectado para ${dataAtual}: ${h}`);
+            }
+          });
         }
       });
 
+      // Salva o último dia processado
+      if (dataAtual && punchesDoDia.length > 0) {
+        mapaMarcacoes.set(dataAtual, punchesDoDia);
+      }
+
+      // Converte o mapa para o formato do banco
+      mapaMarcacoes.forEach((punches, date) => {
+        const marcacao = {
+          date: date,
+          entry_1: punches[0] || '',
+          exit_1: punches[1] || '',
+          entry_2: punches[2] || '',
+          exit_2: punches[3] || '',
+          entry_3: punches[4] || '',
+          exit_3: punches[5] || '',
+          entry_4: punches[6] || '',
+          exit_4: punches[7] || '',
+          entry_5: punches[8] || '',
+          exit_5: punches[9] || '',
+        };
+        marcacoesSalvas.push(marcacao);
+      });
+
+      console.log(`Extração concluída. ${marcacoesSalvas.length} dias processados.`);
+
       // 4. Inserir ou atualizar no banco de dados (Neon DB)
       for (const marcacao of marcacoesSalvas) {
-        await db.insert(timeEntries)
-          .values(marcacao)
-          .onConflictDoUpdate({
-            target: timeEntries.date,
-            set: marcacao
-          });
+        try {
+          await db.insert(timeEntries)
+            .values(marcacao)
+            .onConflictDoUpdate({
+              target: timeEntries.date,
+              set: marcacao
+            });
+        } catch (dbErr) {
+          console.error(`Erro ao salvar marcação de ${marcacao.date}:`, dbErr);
+        }
       }
 
       res.json({ success: true, count: marcacoesSalvas.length });
@@ -237,6 +317,12 @@ async function startServer() {
 
   app.listen(PORT, "0.0.0.0", () => {
     console.log(`Server running on http://localhost:${PORT}`);
+  });
+
+  // Global error handler
+  app.use((err: any, req: express.Request, res: express.Response, next: express.NextFunction) => {
+    console.error("Erro global no servidor:", err);
+    res.status(500).json({ error: "Erro interno no servidor", details: err.message });
   });
 }
 
