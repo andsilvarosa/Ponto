@@ -48,7 +48,11 @@ async function startServer() {
       }, {});
       res.json(settingsMap);
     } catch (error) {
-      res.status(500).json({ error: "Erro ao buscar configurações" });
+      console.error("Erro ao buscar configurações:", error);
+      res.status(500).json({ 
+        error: "Erro ao buscar configurações",
+        details: error instanceof Error ? error.message : String(error)
+      });
     }
   });
 
@@ -106,11 +110,17 @@ async function startServer() {
   // API: Listar Marcações
   app.get("/api/entries", checkDb, async (req, res) => {
     try {
+      console.log("Buscando marcações e feriados...");
       const entriesList = await db.select().from(timeEntries).orderBy(desc(timeEntries.date));
       const holidaysList = await db.select().from(holidays);
+      console.log(`Encontradas ${entriesList.length} marcações e ${holidaysList.length} feriados.`);
       res.json({ entries: entriesList, holidays: holidaysList });
     } catch (error) {
-      res.status(500).json({ error: "Erro ao buscar marcações" });
+      console.error("Erro detalhado ao buscar marcações:", error);
+      res.status(500).json({ 
+        error: "Erro ao buscar marcações", 
+        details: error instanceof Error ? error.message : String(error) 
+      });
     }
   });
 

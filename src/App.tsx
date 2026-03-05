@@ -98,9 +98,9 @@ export default function App() {
       
       if (!entriesRes.ok || !settingsRes.ok) {
         const status = !entriesRes.ok ? entriesRes.status : settingsRes.status;
-        const errText = await (entriesRes.ok ? settingsRes.text() : entriesRes.text());
-        console.error(`Erro na resposta do servidor (Status ${status}):`, errText);
-        throw new Error(`Erro ao buscar dados do servidor: Status ${status}`);
+        const errData = await (entriesRes.ok ? settingsRes.json() : entriesRes.json());
+        console.error(`Erro na resposta do servidor (Status ${status}):`, errData);
+        throw new Error(errData.details || errData.error || `Erro ao buscar dados do servidor: Status ${status}`);
       }
 
       const entriesData = await entriesRes.json();
