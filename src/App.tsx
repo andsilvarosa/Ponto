@@ -97,8 +97,8 @@ export default function App() {
       const entriesData = await entriesRes.json();
       const settingsData = await settingsRes.json();
       
-      setEntries(entriesData.entries);
-      setHolidays(entriesData.holidays);
+      setEntries(Array.isArray(entriesData.entries) ? entriesData.entries : []);
+      setHolidays(Array.isArray(entriesData.holidays) ? entriesData.holidays : []);
       setPreviousBalance(parseInt(settingsData.previous_balance || '0'));
     } catch (err) {
       console.error('Erro ao buscar dados:', err);
@@ -195,7 +195,7 @@ export default function App() {
 
     const todayStr = new Date().toISOString().split('T')[0];
     
-    entries.forEach(entry => {
+    (entries || []).forEach(entry => {
       const { isWeekend, holiday } = getDayStatus(entry.date);
       const entriesArr = [entry.entry_1, entry.entry_2, entry.entry_3, entry.entry_4, entry.entry_5];
       const exitsArr = [entry.exit_1, entry.exit_2, entry.exit_3, entry.exit_4, entry.exit_5];
@@ -348,7 +348,7 @@ export default function App() {
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-white/[0.02]">
-                    {entries.map((entry, idx) => {
+                    {(entries || []).map((entry, idx) => {
                       const { isWeekend, holiday } = getDayStatus(entry.date);
                       const entriesArr = [entry.entry_1, entry.entry_2, entry.entry_3, entry.entry_4, entry.entry_5];
                       const exitsArr = [entry.exit_1, entry.exit_2, entry.exit_3, entry.exit_4, entry.exit_5];
@@ -450,7 +450,7 @@ export default function App() {
                 {Array.from({ length: 31 }).map((_, i) => {
                   const day = i + 1;
                   const dateStr = `2026-03-${String(day).padStart(2, '0')}`;
-                  const entry = entries.find(e => e.date === dateStr);
+                  const entry = (entries || []).find(e => e.date === dateStr);
                   const { isWeekend, holiday } = getDayStatus(dateStr);
                   
                   let balance = 0;
@@ -500,7 +500,7 @@ export default function App() {
                   </h3>
                   <div className="h-[280px] w-full">
                     <ResponsiveContainer width="100%" height="100%">
-                      <BarChart data={entries.slice().reverse()}>
+                      <BarChart data={(entries || []).slice().reverse()}>
                         <CartesianGrid strokeDasharray="3 3" stroke="#ffffff05" vertical={false} />
                         <XAxis 
                           dataKey="date" 
@@ -519,7 +519,7 @@ export default function App() {
                           const exitsArr = [entry.exit_1, entry.exit_2, entry.exit_3, entry.exit_4, entry.exit_5];
                           return calculateDay(entriesArr, exitsArr, isWeekend || !!holiday).balance;
                         }} name="Saldo (min)">
-                          {entries.slice().reverse().map((entry, index) => {
+                          {(entries || []).slice().reverse().map((entry, index) => {
                             const { isWeekend, holiday } = getDayStatus(entry.date);
                             const entriesArr = [entry.entry_1, entry.entry_2, entry.entry_3, entry.entry_4, entry.entry_5];
                             const exitsArr = [entry.exit_1, entry.exit_2, entry.exit_3, entry.exit_4, entry.exit_5];
