@@ -298,34 +298,45 @@ async function startServer() {
 
       // 3. Extrair os dados (Lógica flexível para layouts verticais ou horizontais)
       console.log("Iniciando varredura de linhas para extração...");
+      
+      const hoje = new Date();
+      const hojeIso = hoje.toISOString().split('T')[0];
+      let dataPadrao = hojeIso;
+
       $('tr').each((index, element) => {
         const textoLinha = $(element).text().replace(/\s+/g, ' ').trim();
-        if (index < 20) console.log(`Linha ${index} texto: "${textoLinha}"`);
+        if (index < 30) console.log(`Linha ${index} texto bruto: "${textoLinha}"`);
         
-        // Tenta encontrar uma data no formato DD/MM/YYYY na linha
+        // 1. Tenta encontrar uma data no formato DD/MM/YYYY
         const matchData = textoLinha.match(/(\d{2}\/\d{2}\/\d{4})/);
-        
         if (matchData) {
-          // Se achamos uma nova data, salvamos a anterior se existir
           if (dataAtual && punchesDoDia.length > 0) {
+            console.log(`Salvando dia anterior: ${dataAtual} com ${punchesDoDia.length} batidas.`);
             mapaMarcacoes.set(dataAtual, [...punchesDoDia]);
           }
-          
           const [dia, mes, ano] = matchData[1].split('/');
           dataAtual = `${ano}-${mes}-${dia}`;
           punchesDoDia = [];
-          console.log(`Data detectada: ${matchData[1]} -> ${dataAtual}`);
+          console.log(`Nova data detectada: ${matchData[1]} -> ${dataAtual}`);
         }
 
-        // Tenta encontrar todos os horários (HH:MM) na linha
-        // O regex garante que pegamos apenas horários válidos
-        const matchesHorario = textoLinha.match(/([012]\d:[0-5]\d)/g);
-        if (matchesHorario && dataAtual) {
+        // 2. Tenta encontrar horários (HH:MM)
+        // Regex mais flexível: permite espaços ou caracteres ao redor
+        const matchesHorario = textoLinha.match(/([0-2]?\d:[0-5]\d)/g);
+        if (matchesHorario) {
+          if (!dataAtual) {
+            dataAtual = dataPadrao;
+            console.log(`Horário encontrado sem data prévia. Usando hoje: ${dataAtual}`);
+          }
+
           matchesHorario.forEach(h => {
-            // Evita duplicados na mesma linha (comum em alguns layouts de ASP.NET)
-            if (!punchesDoDia.includes(h)) {
-              punchesDoDia.push(h);
-              console.log(`Horário detectado para ${dataAtual}: ${h}`);
+            // Normaliza o horário para HH:MM (ex: 8:09 -> 08:09)
+            let [hora, min] = h.split(':');
+            const hFormatada = `${hora.padStart(2, '0')}:${min}`;
+            
+            if (!punchesDoDia.includes(hFormatada)) {
+              punchesDoDia.push(hFormatada);
+              console.log(`[${dataAtual}] Batida adicionada: ${hFormatada}`);
             }
           });
         }
@@ -333,11 +344,17 @@ async function startServer() {
 
       // Salva o último dia processado
       if (dataAtual && punchesDoDia.length > 0) {
-        mapaMarcacoes.set(dataAtual, punchesDoDia);
+        console.log(`Salvando último dia processado: ${dataAtual} com ${punchesDoDia.length} batidas.`);
+        mapaMarcacoes.set(dataAtual, [...punchesDoDia]);
       }
+
+      console.log(`Total de dias no mapa: ${mapaMarcacoes.size}`);
 
       // Converte o mapa para o formato do banco
       mapaMarcacoes.forEach((punches, date) => {
+        // Ordenar as batidas do dia para garantir a ordem cronológica
+        punches.sort();
+        
         const marcacao = {
           date: date,
           entry_1: punches[0] || '',
@@ -351,10 +368,11 @@ async function startServer() {
           entry_5: punches[8] || '',
           exit_5: punches[9] || '',
         };
+        console.log(`Preparando para salvar no banco: ${date} ->`, punches);
         marcacoesSalvas.push(marcacao);
       });
 
-      console.log(`Extração concluída. ${marcacoesSalvas.length} dias processados.`);
+      console.log(`Extração finalizada. Enviando ${marcacoesSalvas.length} registros para o banco.`);
 
       // 4. Inserir ou atualizar no banco de dados (Neon DB)
       for (const marcacao of marcacoesSalvas) {

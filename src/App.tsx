@@ -106,6 +106,7 @@ export default function App() {
       const entriesData = await entriesRes.json();
       const settingsData = await settingsRes.json();
       
+      console.log("Dados recebidos do servidor:", entriesData);
       setEntries(Array.isArray(entriesData.entries) ? entriesData.entries : []);
       setHolidays(Array.isArray(entriesData.holidays) ? entriesData.holidays : []);
       setPreviousBalance(parseInt(settingsData.previous_balance || '0'));
