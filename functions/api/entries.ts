@@ -43,12 +43,8 @@ export async function onRequestPost(context: any) {
       // Limpar duplicatas e nulos para permitir a criação da constraint
       await db.execute(sql`DELETE FROM time_entries WHERE date IS NULL`);
       await db.execute(sql`
-        DELETE FROM time_entries
-        WHERE ctid NOT IN (
-          SELECT min(ctid)
-          FROM time_entries
-          GROUP BY date
-        )
+        DELETE FROM time_entries a USING time_entries b
+        WHERE a.date = b.date AND a.ctid > b.ctid
       `);
 
       await db.execute(sql`ALTER TABLE time_entries ADD PRIMARY KEY (date)`);
@@ -57,7 +53,24 @@ export async function onRequestPost(context: any) {
       try {
         await db.execute(sql`ALTER TABLE time_entries ADD CONSTRAINT time_entries_date_unique UNIQUE (date)`);
       } catch (e2) {
-        // Ignora se já existir
+        // Se tudo falhar, e a tabela estiver vazia, recriamos do zero
+        try {
+          const result = await db.execute(sql`SELECT count(*) as total FROM time_entries`);
+          if (Number(result.rows[0].total) === 0) {
+            await db.execute(sql`DROP TABLE IF EXISTS time_entries`);
+            await db.execute(sql`
+              CREATE TABLE time_entries (
+                date TEXT PRIMARY KEY,
+                entry_1 TEXT, exit_1 TEXT,
+                entry_2 TEXT, exit_2 TEXT,
+                entry_3 TEXT, exit_3 TEXT,
+                entry_4 TEXT, exit_4 TEXT,
+                entry_5 TEXT, exit_5 TEXT,
+                created_at TIMESTAMP DEFAULT NOW()
+              )
+            `);
+          }
+        } catch (e3) {}
       }
     }
 

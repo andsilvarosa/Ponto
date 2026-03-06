@@ -19,8 +19,19 @@ export async function onRequestPost(context: any) {
     
     if (!initialResponse.ok) throw new Error("Falha no acesso inicial ao site da empresa.");
 
-    const rawCookies = initialResponse.headers.get('set-cookie') || '';
-    const sessionCookie = rawCookies ? rawCookies.split(',').map(c => c.split(';')[0]).join('; ') : '';
+    let rawCookies: string[] = [];
+    if (typeof initialResponse.headers.getSetCookie === 'function') {
+      rawCookies = initialResponse.headers.getSetCookie();
+    } else {
+      const cookieHeader = initialResponse.headers.get('set-cookie');
+      if (cookieHeader) {
+        // Fallback for environments without getSetCookie
+        // Note: This might break if cookies have commas in their Expires dates,
+        // but it's better than nothing.
+        rawCookies = cookieHeader.split(',').filter(c => !c.trim().startsWith('expires=') && !c.trim().startsWith('Expires='));
+      }
+    }
+    const sessionCookie = rawCookies.map(c => c.split(';')[0]).join('; ');
 
     const initialHtml = await initialResponse.text();
     const $initial = cheerio.load(initialHtml);
@@ -99,12 +110,8 @@ export async function onRequestPost(context: any) {
       // Limpar duplicatas e nulos para permitir a criação da constraint
       await db.execute(sql`DELETE FROM time_entries WHERE date IS NULL`);
       await db.execute(sql`
-        DELETE FROM time_entries
-        WHERE ctid NOT IN (
-          SELECT min(ctid)
-          FROM time_entries
-          GROUP BY date
-        )
+        DELETE FROM time_entries a USING time_entries b
+        WHERE a.date = b.date AND a.ctid > b.ctid
       `);
 
       await db.execute(sql`ALTER TABLE time_entries ADD PRIMARY KEY (date)`);
@@ -113,7 +120,24 @@ export async function onRequestPost(context: any) {
       try {
         await db.execute(sql`ALTER TABLE time_entries ADD CONSTRAINT time_entries_date_unique UNIQUE (date)`);
       } catch (e2) {
-        // Ignora se já existir
+        // Se tudo falhar, e a tabela estiver vazia, recriamos do zero
+        try {
+          const result = await db.execute(sql`SELECT count(*) as total FROM time_entries`);
+          if (Number(result.rows[0].total) === 0) {
+            await db.execute(sql`DROP TABLE IF EXISTS time_entries`);
+            await db.execute(sql`
+              CREATE TABLE time_entries (
+                date TEXT PRIMARY KEY,
+                entry_1 TEXT, exit_1 TEXT,
+                entry_2 TEXT, exit_2 TEXT,
+                entry_3 TEXT, exit_3 TEXT,
+                entry_4 TEXT, exit_4 TEXT,
+                entry_5 TEXT, exit_5 TEXT,
+                created_at TIMESTAMP DEFAULT NOW()
+              )
+            `);
+          }
+        } catch (e3) {}
       }
     }
 
@@ -127,6 +151,7 @@ export async function onRequestPost(context: any) {
     }
 
     let savedCount = 0;
+    const dbErrors: string[] = [];
     for (const [date, punches] of Array.from(mapaMarcacoes.entries())) {
       punches.sort();
       const marcacao: any = {
@@ -142,12 +167,22 @@ export async function onRequestPost(context: any) {
         const { date: d, ...updateData } = marcacao;
         await db.insert(timeEntries).values(marcacao).onConflictDoUpdate({ target: timeEntries.date, set: updateData });
         savedCount++;
-      } catch (e) {
+      } catch (e: any) {
         console.error("Erro ao guardar no DB:", e);
+        dbErrors.push(e.message);
       }
     }
 
-    return Response.json({ success: true, count: savedCount });
+    if (savedCount === 0) {
+      return Response.json({ 
+        success: true, 
+        count: savedCount, 
+        debugHtml: finalHtml.substring(0, 1000),
+        dbErrors: dbErrors.slice(0, 5) // Return first 5 errors to avoid huge payloads
+      });
+    }
+
+    return Response.json({ success: true, count: savedCount, dbErrors: dbErrors.length > 0 ? dbErrors.slice(0, 5) : undefined });
   } catch (error: any) {
     return Response.json({ error: "Erro no processamento do scraping", details: error.message }, { status: 500 });
   }
