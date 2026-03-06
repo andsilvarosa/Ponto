@@ -39,9 +39,26 @@ export async function onRequestPost(context: any) {
           created_at TIMESTAMP DEFAULT NOW()
         )
       `);
+      
+      // Limpar duplicatas e nulos para permitir a criação da constraint
+      await db.execute(sql`DELETE FROM time_entries WHERE date IS NULL`);
+      await db.execute(sql`
+        DELETE FROM time_entries
+        WHERE ctid NOT IN (
+          SELECT min(ctid)
+          FROM time_entries
+          GROUP BY date
+        )
+      `);
+
       await db.execute(sql`ALTER TABLE time_entries ADD PRIMARY KEY (date)`);
-    } catch (e) {
-      // Ignora se a PK já existir
+    } catch (e: any) {
+      // Se falhar (ex: já existe uma PK noutra coluna), tentamos adicionar UNIQUE
+      try {
+        await db.execute(sql`ALTER TABLE time_entries ADD CONSTRAINT time_entries_date_unique UNIQUE (date)`);
+      } catch (e2) {
+        // Ignora se já existir
+      }
     }
 
     // Garantir que as colunas são do tipo TEXT
