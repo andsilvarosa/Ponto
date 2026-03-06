@@ -68,7 +68,11 @@ export async function onRequestPost(context: any) {
     const mapaMarcacoes: Map<string, any> = new Map();
 
     // 3. Extração de dados da Tabela
+    let lineCount = 0;
     $('tr').each((index, element) => {
+      lineCount++;
+      if (lineCount < 10) return; // Pular as primeiras 9 linhas
+
       const textoLinha = $(element).text().replace(/\s+/g, ' ').trim();
       const matchData = textoLinha.match(/(\d{2}\/\d{2}\/\d{4})/);
       
