@@ -148,12 +148,17 @@ export default function App() {
       
       if (!response.ok) {
         let errorMsg = `Erro ao salvar: Status ${response.status}`;
+        const responseClone = response.clone();
         try {
           const errorData = await response.json();
           errorMsg = errorData.details || errorData.error || errorMsg;
         } catch (e) {
-          const text = await response.text();
-          if (text) errorMsg += ` - ${text.substring(0, 100)}`;
+          try {
+            const text = await responseClone.text();
+            if (text) errorMsg += ` - ${text.substring(0, 100)}`;
+          } catch (textErr) {
+            console.error("Erro ao ler corpo da resposta como texto:", textErr);
+          }
         }
         throw new Error(errorMsg);
       }
@@ -217,12 +222,17 @@ export default function App() {
       
       if (!response.ok) {
         let errorMsg = `Erro ao sincronizar: Status ${response.status}`;
+        const responseClone = response.clone();
         try {
           const errorData = await response.json();
           errorMsg = errorData.details || errorData.error || errorMsg;
         } catch (e) {
-          const text = await response.text();
-          if (text) errorMsg += ` - ${text.substring(0, 100)}`;
+          try {
+            const text = await responseClone.text();
+            if (text) errorMsg += ` - ${text.substring(0, 100)}`;
+          } catch (textErr) {
+            console.error("Erro ao ler corpo da resposta como texto:", textErr);
+          }
         }
         console.error(`Erro na sincronização:`, errorMsg);
         alert(errorMsg);

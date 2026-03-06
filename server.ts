@@ -65,7 +65,8 @@ async function startServer() {
           // Tenta adicionar se não existir
           await db.execute(sql.raw(`ALTER TABLE time_entries ADD COLUMN IF NOT EXISTS ${col} TEXT`));
           // Força o tipo para TEXT caso já exista como outro tipo (ex: TIME)
-          await db.execute(sql.raw(`ALTER TABLE time_entries ALTER COLUMN ${col} TYPE TEXT`));
+          // Usamos USING para garantir a conversão de tipos existentes
+          await db.execute(sql.raw(`ALTER TABLE time_entries ALTER COLUMN ${col} TYPE TEXT USING ${col}::TEXT`));
         } catch (e) { 
           console.log(`Aviso ao ajustar coluna ${col}:`, e);
         }
@@ -204,15 +205,16 @@ async function startServer() {
       
       // Limpeza: converter strings vazias em null para evitar problemas de tipo no banco
       const timeFields = ['entry_1', 'exit_1', 'entry_2', 'exit_2', 'entry_3', 'exit_3', 'entry_4', 'exit_4', 'entry_5', 'exit_5'];
+      const cleanedData: any = { date: data.date };
       timeFields.forEach(field => {
-        if (data[field] === '') data[field] = null;
+        cleanedData[field] = (data[field] === '' || data[field] === undefined) ? null : data[field];
       });
 
       await db.insert(timeEntries)
-        .values(data)
+        .values(cleanedData)
         .onConflictDoUpdate({
           target: timeEntries.date,
-          set: data
+          set: cleanedData
         });
       console.log("Marcação salva com sucesso:", data.date);
       res.json({ success: true });
@@ -376,7 +378,7 @@ async function startServer() {
         // Ordenar as batidas do dia para garantir a ordem cronológica
         punches.sort();
         
-        const marcacao = {
+        const marcacao: any = {
           date: date,
           entry_1: punches[0] || null,
           exit_1: punches[1] || null,
@@ -389,6 +391,13 @@ async function startServer() {
           entry_5: punches[8] || null,
           exit_5: punches[9] || null,
         };
+        
+        // Garantir que campos vazios sejam null
+        const timeFields = ['entry_1', 'exit_1', 'entry_2', 'exit_2', 'entry_3', 'exit_3', 'entry_4', 'exit_4', 'entry_5', 'exit_5'];
+        timeFields.forEach(f => {
+          if (marcacao[f] === '') marcacao[f] = null;
+        });
+
         console.log(`Preparando para salvar no banco: ${date} ->`, punches);
         marcacoesSalvas.push(marcacao);
       });
@@ -396,6 +405,9 @@ async function startServer() {
       console.log(`Extração finalizada. Enviando ${marcacoesSalvas.length} registros para o banco.`);
 
       // 4. Inserir ou atualizar no banco de dados (Neon DB)
+      let savedCount = 0;
+      let errors = [];
+      
       for (const marcacao of marcacoesSalvas) {
         try {
           await db.insert(timeEntries)
@@ -404,12 +416,22 @@ async function startServer() {
               target: timeEntries.date,
               set: marcacao
             });
+          savedCount++;
         } catch (dbErr) {
           console.error(`Erro ao salvar marcação de ${marcacao.date}:`, dbErr);
+          errors.push(`${marcacao.date}: ${dbErr instanceof Error ? dbErr.message : String(dbErr)}`);
         }
       }
 
-      res.json({ success: true, count: marcacoesSalvas.length });
+      if (savedCount === 0 && marcacoesSalvas.length > 0) {
+        return res.status(500).json({ 
+          success: false, 
+          error: "Falha ao salvar no banco de dados", 
+          details: errors.join("; ") 
+        });
+      }
+
+      res.json({ success: true, count: savedCount, total: marcacoesSalvas.length, errors: errors.length > 0 ? errors : undefined });
 
     } catch (error) {
       console.error("Erro no scraping:", error);
