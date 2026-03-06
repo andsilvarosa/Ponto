@@ -52,12 +52,23 @@ async function startServer() {
         )
       `);
 
-      // Garantir que as colunas novas existam (caso a tabela já existisse sem elas)
-      const columns = ['entry_3', 'exit_3', 'entry_4', 'exit_4', 'entry_5', 'exit_5'];
+      // Garantir que as colunas existam e tenham o tipo correto (TEXT)
+      const columns = [
+        'entry_1', 'exit_1', 
+        'entry_2', 'exit_2', 
+        'entry_3', 'exit_3', 
+        'entry_4', 'exit_4', 
+        'entry_5', 'exit_5'
+      ];
       for (const col of columns) {
         try {
+          // Tenta adicionar se não existir
           await db.execute(sql.raw(`ALTER TABLE time_entries ADD COLUMN IF NOT EXISTS ${col} TEXT`));
-        } catch (e) { /* Coluna já existe */ }
+          // Força o tipo para TEXT caso já exista como outro tipo (ex: TIME)
+          await db.execute(sql.raw(`ALTER TABLE time_entries ALTER COLUMN ${col} TYPE TEXT`));
+        } catch (e) { 
+          console.log(`Aviso ao ajustar coluna ${col}:`, e);
+        }
       }
 
       // Criar tabela de configurações
@@ -188,8 +199,15 @@ async function startServer() {
   // API: Salvar Marcação
   app.post("/api/entries", checkDb, async (req, res) => {
     try {
-      const data = req.body;
+      const data = { ...req.body };
       console.log("Recebendo nova marcação para salvar:", data.date);
+      
+      // Limpeza: converter strings vazias em null para evitar problemas de tipo no banco
+      const timeFields = ['entry_1', 'exit_1', 'entry_2', 'exit_2', 'entry_3', 'exit_3', 'entry_4', 'exit_4', 'entry_5', 'exit_5'];
+      timeFields.forEach(field => {
+        if (data[field] === '') data[field] = null;
+      });
+
       await db.insert(timeEntries)
         .values(data)
         .onConflictDoUpdate({
@@ -200,7 +218,10 @@ async function startServer() {
       res.json({ success: true });
     } catch (error) {
       console.error("Erro ao salvar marcação no banco:", error);
-      res.status(500).json({ error: "Erro ao salvar marcação no banco de dados. Verifique se o banco está configurado corretamente." });
+      res.status(500).json({ 
+        error: "Erro ao salvar marcação no banco de dados.",
+        details: error instanceof Error ? error.message : String(error)
+      });
     }
   });
 
@@ -357,16 +378,16 @@ async function startServer() {
         
         const marcacao = {
           date: date,
-          entry_1: punches[0] || '',
-          exit_1: punches[1] || '',
-          entry_2: punches[2] || '',
-          exit_2: punches[3] || '',
-          entry_3: punches[4] || '',
-          exit_3: punches[5] || '',
-          entry_4: punches[6] || '',
-          exit_4: punches[7] || '',
-          entry_5: punches[8] || '',
-          exit_5: punches[9] || '',
+          entry_1: punches[0] || null,
+          exit_1: punches[1] || null,
+          entry_2: punches[2] || null,
+          exit_2: punches[3] || null,
+          entry_3: punches[4] || null,
+          exit_3: punches[5] || null,
+          entry_4: punches[6] || null,
+          exit_4: punches[7] || null,
+          entry_5: punches[8] || null,
+          exit_5: punches[9] || null,
         };
         console.log(`Preparando para salvar no banco: ${date} ->`, punches);
         marcacoesSalvas.push(marcacao);

@@ -145,10 +145,19 @@ export default function App() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(formData),
       });
+      
       if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Erro ao salvar marcação');
+        let errorMsg = `Erro ao salvar: Status ${response.status}`;
+        try {
+          const errorData = await response.json();
+          errorMsg = errorData.details || errorData.error || errorMsg;
+        } catch (e) {
+          const text = await response.text();
+          if (text) errorMsg += ` - ${text.substring(0, 100)}`;
+        }
+        throw new Error(errorMsg);
       }
+      
       setIsModalOpen(false);
       setIsEditing(false);
       fetchData();
@@ -207,10 +216,17 @@ export default function App() {
       const response = await fetch('/api/sync-ponto-empresa', { method: 'POST' });
       
       if (!response.ok) {
-        const errorText = await response.text();
-        console.error(`Erro na sincronização (Status ${response.status}):`, errorText);
-        alert(`Erro ao sincronizar: Status ${response.status}. Verifique os logs do console.`);
-        throw new Error(`O servidor retornou um erro: ${response.status}`);
+        let errorMsg = `Erro ao sincronizar: Status ${response.status}`;
+        try {
+          const errorData = await response.json();
+          errorMsg = errorData.details || errorData.error || errorMsg;
+        } catch (e) {
+          const text = await response.text();
+          if (text) errorMsg += ` - ${text.substring(0, 100)}`;
+        }
+        console.error(`Erro na sincronização:`, errorMsg);
+        alert(errorMsg);
+        throw new Error(errorMsg);
       }
 
       const data = await response.json();
