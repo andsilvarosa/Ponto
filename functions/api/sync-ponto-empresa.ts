@@ -44,11 +44,12 @@ export async function onRequestPost(context: any) {
 
     // 2. POST com Form Data simulado
     const formData = new URLSearchParams();
+    formData.append('__EVENTTARGET', 'btnConsultar');
+    formData.append('__EVENTARGUMENT', '');
     formData.append('__VIEWSTATE', viewState);
     if (viewStateGenerator) formData.append('__VIEWSTATEGENERATOR', viewStateGenerator);
     if (eventValidation) formData.append('__EVENTVALIDATION', eventValidation);
     formData.append('txtMatricula', matricula);
-    formData.append('btnConsultar', 'Consultar');
 
     const postResponse = await fetch(url, {
       method: 'POST',
@@ -62,29 +63,17 @@ export async function onRequestPost(context: any) {
 
     const finalHtml = await postResponse.text();
     const $ = cheerio.load(finalHtml);
-    const marcacoesSalvas: any[] = [];
-    let dataAtual: string | null = null;
-    let punchesDoDia: string[] = [];
     const mapaMarcacoes: Map<string, any> = new Map();
 
     // 3. Extração de dados da Tabela
-    let lineCount = 0;
-    $('tr').each((index, element) => {
-      lineCount++;
-      if (lineCount < 10) return; // Pular as primeiras 9 linhas
+    const dataAtual = new Date().toLocaleDateString('en-CA', { timeZone: 'America/Sao_Paulo' });
+    const punchesDoDia: string[] = [];
 
+    $('#Grid tr').each((index, element) => {
       const textoLinha = $(element).text().replace(/\s+/g, ' ').trim();
-      const matchData = textoLinha.match(/(\d{2}\/\d{2}\/\d{4})/);
-      
-      if (matchData) {
-        if (dataAtual && punchesDoDia.length > 0) mapaMarcacoes.set(dataAtual, [...punchesDoDia]);
-        const [dia, mes, ano] = matchData[1].split('/');
-        dataAtual = `${ano}-${mes}-${dia}`;
-        punchesDoDia = [];
-      }
-
       const matchesHorario = textoLinha.match(/([0-2]?\d:[0-5]\d)/g);
-      if (matchesHorario && dataAtual) {
+      
+      if (matchesHorario) {
         matchesHorario.forEach(h => {
           let [hora, min] = h.split(':');
           const hFormatada = `${hora.padStart(2, '0')}:${min}`;
@@ -93,7 +82,9 @@ export async function onRequestPost(context: any) {
       }
     });
 
-    if (dataAtual && punchesDoDia.length > 0) mapaMarcacoes.set(dataAtual, [...punchesDoDia]);
+    if (punchesDoDia.length > 0) {
+      mapaMarcacoes.set(dataAtual, [...punchesDoDia]);
+    }
 
     // 4. Transformar e Guardar no Neon DB
     
