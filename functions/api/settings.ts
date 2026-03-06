@@ -1,12 +1,23 @@
 import { settings } from "../../src/db/schema";
+import { sql } from "drizzle-orm";
 import { neon } from '@neondatabase/serverless';
 import { drizzle } from 'drizzle-orm/neon-http';
 
 export async function onRequestGet(context: any) {
-  const sql = neon(context.env.DATABASE_URL);
-  const db = drizzle(sql);
+  const sqlClient = neon(context.env.DATABASE_URL);
+  const db = drizzle(sqlClient);
 
   try {
+    try {
+      await db.execute(sql`
+        CREATE TABLE IF NOT EXISTS settings (
+          key TEXT PRIMARY KEY,
+          value TEXT NOT NULL
+        )
+      `);
+      await db.execute(sql`ALTER TABLE settings ADD PRIMARY KEY (key)`);
+    } catch (e) {}
+
     const allSettings = await db.select().from(settings);
     const settingsMap = allSettings.reduce((acc: any, curr: any) => {
       acc[curr.key] = curr.value;
@@ -19,10 +30,20 @@ export async function onRequestGet(context: any) {
 }
 
 export async function onRequestPost(context: any) {
-  const sql = neon(context.env.DATABASE_URL);
-  const db = drizzle(sql);
+  const sqlClient = neon(context.env.DATABASE_URL);
+  const db = drizzle(sqlClient);
 
   try {
+    try {
+      await db.execute(sql`
+        CREATE TABLE IF NOT EXISTS settings (
+          key TEXT PRIMARY KEY,
+          value TEXT NOT NULL
+        )
+      `);
+      await db.execute(sql`ALTER TABLE settings ADD PRIMARY KEY (key)`);
+    } catch (e) {}
+
     const { previous_balance } = await context.request.json();
     if (previous_balance !== undefined) {
       await db.insert(settings)

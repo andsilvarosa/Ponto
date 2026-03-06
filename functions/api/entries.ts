@@ -1,13 +1,13 @@
 import { timeEntries, holidays } from "../../src/db/schema";
-import { desc } from "drizzle-orm";
+import { desc, sql } from "drizzle-orm";
 import { neon } from '@neondatabase/serverless';
 import { drizzle } from 'drizzle-orm/neon-http';
 
 // Corresponde a um GET /api/entries
 export async function onRequestGet(context: any) {
   // A ligação ao Neon é feita aqui, garantindo que corre na Edge do Cloudflare
-  const sql = neon(context.env.DATABASE_URL);
-  const db = drizzle(sql);
+  const sqlClient = neon(context.env.DATABASE_URL);
+  const db = drizzle(sqlClient);
 
   try {
     const entriesList = await db.select().from(timeEntries).orderBy(desc(timeEntries.date));
@@ -20,12 +20,39 @@ export async function onRequestGet(context: any) {
 
 // Corresponde a um POST /api/entries
 export async function onRequestPost(context: any) {
-  const sql = neon(context.env.DATABASE_URL);
-  const db = drizzle(sql);
+  const sqlClient = neon(context.env.DATABASE_URL);
+  const db = drizzle(sqlClient);
 
   try {
     const data = await context.request.json();
     
+    // Garantir que a tabela e a chave primária existem no banco de produção
+    try {
+      await db.execute(sql`
+        CREATE TABLE IF NOT EXISTS time_entries (
+          date TEXT PRIMARY KEY,
+          entry_1 TEXT, exit_1 TEXT,
+          entry_2 TEXT, exit_2 TEXT,
+          entry_3 TEXT, exit_3 TEXT,
+          entry_4 TEXT, exit_4 TEXT,
+          entry_5 TEXT, exit_5 TEXT,
+          created_at TIMESTAMP DEFAULT NOW()
+        )
+      `);
+      await db.execute(sql`ALTER TABLE time_entries ADD PRIMARY KEY (date)`);
+    } catch (e) {
+      // Ignora se a PK já existir
+    }
+
+    // Garantir que as colunas são do tipo TEXT
+    const columns = ['entry_1', 'exit_1', 'entry_2', 'exit_2', 'entry_3', 'exit_3', 'entry_4', 'exit_4', 'entry_5', 'exit_5'];
+    for (const col of columns) {
+      try {
+        await db.execute(sql.raw(`ALTER TABLE time_entries ADD COLUMN IF NOT EXISTS ${col} TEXT`));
+        await db.execute(sql.raw(`ALTER TABLE time_entries ALTER COLUMN ${col} TYPE TEXT USING ${col}::TEXT`));
+      } catch (e) {}
+    }
+
     // Limpeza de campos vazios
     const timeFields = ['entry_1', 'exit_1', 'entry_2', 'exit_2', 'entry_3', 'exit_3', 'entry_4', 'exit_4', 'entry_5', 'exit_5'];
     const cleanedData: any = { date: data.date };
