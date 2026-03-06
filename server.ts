@@ -52,6 +52,13 @@ async function startServer() {
         )
       `);
 
+      // Garantir que a coluna 'date' seja de fato a PRIMARY KEY
+      try {
+        await db.execute(sql`ALTER TABLE time_entries ADD PRIMARY KEY (date)`);
+      } catch (e) {
+        // Já deve ser PK, ignorar
+      }
+
       // Garantir que as colunas existam e tenham o tipo correto (TEXT)
       const columns = [
         'entry_1', 'exit_1', 
@@ -210,11 +217,12 @@ async function startServer() {
         cleanedData[field] = (data[field] === '' || data[field] === undefined) ? null : data[field];
       });
 
+      const { date, ...updateData } = cleanedData;
       await db.insert(timeEntries)
         .values(cleanedData)
         .onConflictDoUpdate({
           target: timeEntries.date,
-          set: cleanedData
+          set: updateData
         });
       console.log("Marcação salva com sucesso:", data.date);
       res.json({ success: true });
@@ -409,12 +417,13 @@ async function startServer() {
       let errors = [];
       
       for (const marcacao of marcacoesSalvas) {
+        const { date, ...updateData } = marcacao;
         try {
           await db.insert(timeEntries)
             .values(marcacao)
             .onConflictDoUpdate({
               target: timeEntries.date,
-              set: marcacao
+              set: updateData
             });
           savedCount++;
         } catch (dbErr) {
