@@ -19,7 +19,8 @@ import {
   Calendar,
   BarChart3,
   Settings,
-  PlusCircle
+  PlusCircle,
+  Sun
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { 
@@ -67,6 +68,15 @@ export default function App() {
   const [previousBalance, setPreviousBalance] = useState(0);
   const [loading, setLoading] = useState(true);
   const [isSyncingCompany, setIsSyncingCompany] = useState(false);
+  const [theme, setTheme] = useState<'dark' | 'light'>('dark');
+
+  useEffect(() => {
+    if (theme === 'dark') {
+      document.documentElement.classList.add('dark');
+    } else {
+      document.documentElement.classList.remove('dark');
+    }
+  }, [theme]);
 
   // Form state
   const [formData, setFormData] = useState<TimeEntry>({
@@ -287,36 +297,42 @@ export default function App() {
   const stats = calculateStats();
 
   return (
-    <div className="min-h-screen bg-[#0a0a0a] text-zinc-100 font-sans selection:bg-emerald-500/30">
+    <div className="min-h-screen bg-zinc-50 dark:bg-[#0a0a0a] text-zinc-900 dark:text-zinc-100 font-sans selection:bg-emerald-500/30">
       {/* Sidebar / Navigation */}
-      <nav className="fixed left-0 top-0 h-full w-20 border-r border-white/5 bg-black/20 backdrop-blur-xl flex flex-col items-center py-8 gap-8 z-50">
+      <nav className="fixed left-0 top-0 h-full w-20 border-r border-black/5 dark:border-white/5 bg-white/50 dark:bg-black/20 backdrop-blur-xl flex flex-col items-center py-8 gap-8 z-50">
         <div className="w-12 h-12 bg-emerald-500 rounded-2xl flex items-center justify-center shadow-lg shadow-emerald-500/20">
           <Clock className="text-black w-6 h-6" />
         </div>
         <div className="flex flex-col gap-6 mt-8">
           <button 
             onClick={() => setActiveTab('history')}
-            className={`p-3 rounded-xl transition-all ${activeTab === 'history' ? 'text-emerald-500 bg-emerald-500/10' : 'text-zinc-500 hover:text-zinc-300'}`}
+            className={`p-3 rounded-xl transition-all ${activeTab === 'history' ? 'text-emerald-500 bg-emerald-500/10' : 'text-zinc-500 dark:text-zinc-500 hover:text-zinc-700 dark:text-zinc-300'}`}
           >
             <LayoutDashboard className="w-6 h-6" />
           </button>
           <button 
             onClick={() => setActiveTab('calendar')}
-            className={`p-3 rounded-xl transition-all ${activeTab === 'calendar' ? 'text-emerald-500 bg-emerald-500/10' : 'text-zinc-500 hover:text-zinc-300'}`}
+            className={`p-3 rounded-xl transition-all ${activeTab === 'calendar' ? 'text-emerald-500 bg-emerald-500/10' : 'text-zinc-500 dark:text-zinc-500 hover:text-zinc-700 dark:text-zinc-300'}`}
           >
             <CalendarDays className="w-6 h-6" />
           </button>
           <button 
             onClick={() => setActiveTab('stats')}
-            className={`p-3 rounded-xl transition-all ${activeTab === 'stats' ? 'text-emerald-500 bg-emerald-500/10' : 'text-zinc-500 hover:text-zinc-300'}`}
+            className={`p-3 rounded-xl transition-all ${activeTab === 'stats' ? 'text-emerald-500 bg-emerald-500/10' : 'text-zinc-500 dark:text-zinc-500 hover:text-zinc-700 dark:text-zinc-300'}`}
           >
             <Activity className="w-6 h-6" />
           </button>
           <button 
-            className="p-3 text-zinc-500 hover:text-zinc-300 transition-all" 
+            className="p-3 text-zinc-500 dark:text-zinc-500 hover:text-zinc-700 dark:text-zinc-300 transition-all" 
             onClick={() => setIsSettingsOpen(true)}
           >
             <Settings2 className="w-6 h-6" />
+          </button>
+          <button 
+            className="p-3 text-zinc-500 dark:text-zinc-500 hover:text-zinc-700 dark:text-zinc-300 transition-all" 
+            onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
+          >
+            {theme === 'dark' ? <Sun className="w-6 h-6" /> : <Moon className="w-6 h-6" />}
           </button>
         </div>
       </nav>
@@ -326,18 +342,18 @@ export default function App() {
         <header className="flex flex-col md:flex-row justify-between items-start md:items-center mb-12 gap-6">
           <div>
             <h1 className="text-4xl font-bold tracking-tight mb-2">Ponto CLT</h1>
-            <p className="text-zinc-500 flex items-center gap-2">
+            <p className="text-zinc-500 dark:text-zinc-500 flex items-center gap-2">
               <CalendarDays className="w-4 h-4" />
               {currentTime.toLocaleDateString('pt-BR', { weekday: 'long', day: 'numeric', month: 'long' })}
             </p>
           </div>
 
-          <div className="flex items-center gap-6 bg-white/5 p-4 rounded-3xl border border-white/10 backdrop-blur-md">
+          <div className="flex items-center gap-6 bg-black/5 dark:bg-white/5 p-4 rounded-3xl border border-black/10 dark:border-white/10 backdrop-blur-md">
             <div className="text-right hidden sm:block">
               <p className="text-3xl font-mono font-medium text-emerald-400">
                 {currentTime.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
               </p>
-              <p className="text-xs text-zinc-500 uppercase tracking-widest">Brasília, DF</p>
+              <p className="text-xs text-zinc-500 dark:text-zinc-500 uppercase tracking-widest">Brasília, DF</p>
             </div>
             
             <div className="flex flex-col gap-2">
@@ -363,43 +379,43 @@ export default function App() {
 
         {/* Metrics */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-12">
-          <div className="bg-white/5 border border-white/10 p-6 rounded-[2rem] backdrop-blur-sm">
+          <div className="bg-black/5 dark:bg-white/5 border border-black/10 dark:border-white/10 p-6 rounded-[2rem] backdrop-blur-sm">
             <div className="flex justify-between items-start mb-4">
               <div className="p-3 bg-emerald-500/10 rounded-2xl">
                 <TrendingUp className="w-5 h-5 text-emerald-500" />
               </div>
-              <span className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest">Saldo Total</span>
+              <span className="text-[10px] font-bold text-zinc-500 dark:text-zinc-500 uppercase tracking-widest">Saldo Total</span>
             </div>
             <p className={`text-3xl font-mono font-bold ${stats.totalBalance >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
               {stats.totalBalance >= 0 ? '+' : ''}{minutesToTime(stats.totalBalance)}
             </p>
-            <p className="text-xs text-zinc-500 mt-2">Acumulado no período</p>
+            <p className="text-xs text-zinc-500 dark:text-zinc-500 mt-2">Acumulado no período</p>
           </div>
 
-          <div className="bg-white/5 border border-white/10 p-6 rounded-[2rem] backdrop-blur-sm">
+          <div className="bg-black/5 dark:bg-white/5 border border-black/10 dark:border-white/10 p-6 rounded-[2rem] backdrop-blur-sm">
             <div className="flex justify-between items-start mb-4">
               <div className="p-3 bg-indigo-500/10 rounded-2xl">
                 <Moon className="w-5 h-5 text-indigo-400" />
               </div>
-              <span className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest">Adicional Noturno</span>
+              <span className="text-[10px] font-bold text-zinc-500 dark:text-zinc-500 uppercase tracking-widest">Adicional Noturno</span>
             </div>
             <p className="text-3xl font-mono font-bold text-indigo-400">
               {minutesToTime(stats.totalNight)}
             </p>
-            <p className="text-xs text-zinc-500 mt-2">Horas fictas calculadas</p>
+            <p className="text-xs text-zinc-500 dark:text-zinc-500 mt-2">Horas fictas calculadas</p>
           </div>
 
-          <div className="bg-white/5 border border-white/10 p-6 rounded-[2rem] backdrop-blur-sm">
+          <div className="bg-black/5 dark:bg-white/5 border border-black/10 dark:border-white/10 p-6 rounded-[2rem] backdrop-blur-sm">
             <div className="flex justify-between items-start mb-4">
               <div className="p-3 bg-zinc-500/10 rounded-2xl">
-                <Activity className="w-5 h-5 text-zinc-400" />
+                <Activity className="w-5 h-5 text-zinc-600 dark:text-zinc-400" />
               </div>
-              <span className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest">Hoje</span>
+              <span className="text-[10px] font-bold text-zinc-500 dark:text-zinc-500 uppercase tracking-widest">Hoje</span>
             </div>
-            <p className="text-3xl font-mono font-bold text-zinc-100">
+            <p className="text-3xl font-mono font-bold text-zinc-900 dark:text-zinc-100">
               {minutesToTime(stats.workedToday)}
             </p>
-            <p className="text-xs text-zinc-500 mt-2">Tempo trabalhado hoje</p>
+            <p className="text-xs text-zinc-500 dark:text-zinc-500 mt-2">Tempo trabalhado hoje</p>
           </div>
         </div>
 
@@ -410,14 +426,14 @@ export default function App() {
               initial={{ opacity: 0, y: 10 }}
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -10 }}
-              className="bg-[#121214] border border-white/[0.04] rounded-2xl overflow-hidden"
+              className="bg-white dark:bg-[#121214] border border-black/[0.04] dark:border-white/[0.04] rounded-2xl overflow-hidden"
             >
-              <div className="p-8 border-b border-white/[0.04] flex justify-between items-center">
-                <h2 className="text-sm font-semibold uppercase tracking-widest text-zinc-100 flex items-center gap-2">
+              <div className="p-8 border-b border-black/[0.04] dark:border-white/[0.04] flex justify-between items-center">
+                <h2 className="text-sm font-semibold uppercase tracking-widest text-zinc-900 dark:text-zinc-100 flex items-center gap-2">
                   <LayoutDashboard className="w-4 h-4 text-emerald-500" />
                   Espelho de Ponto
                 </h2>
-                <span className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest bg-white/5 px-3 py-1 rounded-full">
+                <span className="text-[10px] font-bold text-zinc-500 dark:text-zinc-500 uppercase tracking-widest bg-black/5 dark:bg-white/5 px-3 py-1 rounded-full">
                   Março 2026
                 </span>
               </div>
@@ -425,7 +441,7 @@ export default function App() {
               <div className="overflow-x-auto">
                 <table className="w-full text-left border-collapse">
                   <thead>
-                    <tr className="text-zinc-600 text-[10px] font-bold uppercase tracking-widest border-b border-white/[0.04]">
+                    <tr className="text-zinc-600 dark:text-zinc-400 text-[10px] font-bold uppercase tracking-widest border-b border-black/[0.04] dark:border-white/[0.04]">
                       <th className="px-8 py-5">Data</th>
                       <th className="px-4 py-5">Registros</th>
                       <th className="px-4 py-5">Total</th>
@@ -433,7 +449,7 @@ export default function App() {
                       <th className="px-8 py-5 text-right">Ações</th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-white/[0.02]">
+                  <tbody className="divide-y divide-black/[0.02] dark:divide-white/[0.02]">
                     {(entries || []).map((entry, idx) => {
                       const { isWeekend, holiday } = getDayStatus(entry.date);
                       const entriesArr = [entry.entry_1, entry.entry_2, entry.entry_3, entry.entry_4, entry.entry_5];
@@ -443,42 +459,42 @@ export default function App() {
                       return (
                         <tr 
                           key={entry.date} 
-                          className={`group hover:bg-white/[0.02] transition-colors ${isWeekend || holiday ? 'bg-emerald-500/[0.02]' : ''}`}
+                          className={`group hover:bg-black/[0.02] dark:bg-white/[0.02] transition-colors ${isWeekend || holiday ? 'bg-emerald-500/[0.02]' : ''}`}
                         >
                           <td className="px-8 py-5">
                             <div className="flex flex-col">
-                              <span className="text-sm font-medium text-zinc-300">
+                              <span className="text-sm font-medium text-zinc-700 dark:text-zinc-300">
                                 {new Date(entry.date + 'T00:00:00').toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' })}
                               </span>
-                              <span className="text-[10px] text-zinc-600 uppercase font-bold">
+                              <span className="text-[10px] text-zinc-600 dark:text-zinc-400 uppercase font-bold">
                                 {new Date(entry.date + 'T00:00:00').toLocaleDateString('pt-BR', { weekday: 'short' })}
                                 {holiday && ` • ${holiday.name}`}
                               </span>
                             </div>
                           </td>
                           <td className="px-4 py-5">
-                            <div className="flex flex-wrap gap-1.5 max-w-md">
+                            <div className="flex flex-wrap gap-2 max-w-md">
                               {[1, 2, 3, 4, 5].map(i => {
                                 const e = (entry as any)[`entry_${i}`];
                                 const s = (entry as any)[`exit_${i}`];
                                 if (!e && !s) return null;
                                 return (
-                                  <div key={i} className="flex items-center gap-1 bg-white/[0.03] px-2 py-0.5 rounded border border-white/[0.05] text-[10px] font-mono">
-                                    <span className="text-emerald-500/70">{e || '--:--'}</span>
-                                    <span className="text-zinc-700">·</span>
-                                    <span className="text-rose-500/70">{s || '--:--'}</span>
+                                  <div key={i} className="flex items-center gap-2 bg-black/[0.05] dark:bg-white/[0.05] px-3 py-1.5 rounded-lg border border-black/[0.1] dark:border-white/[0.1] text-sm font-mono shadow-sm">
+                                    <span className="text-emerald-600 dark:text-emerald-400 font-bold">{e || '--:--'}</span>
+                                    <span className="text-zinc-600 dark:text-zinc-400 font-black">·</span>
+                                    <span className="text-rose-600 dark:text-rose-400 font-bold">{s || '--:--'}</span>
                                   </div>
                                 );
                               })}
                             </div>
                           </td>
                           <td className="px-4 py-5">
-                            <span className="text-xs font-mono text-zinc-400">
+                            <span className="text-base font-mono font-bold text-zinc-700 dark:text-zinc-300">
                               {minutesToTime(result.totalWorked)}
                             </span>
                           </td>
                           <td className="px-4 py-5">
-                            <span className={`text-xs font-mono font-bold ${result.balance >= 0 ? 'text-emerald-500/80' : 'text-rose-500/80'}`}>
+                            <span className={`text-base font-mono font-bold ${result.balance >= 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-rose-600 dark:text-rose-400'}`}>
                               {result.balance > 0 ? '+' : ''}{minutesToTime(result.balance)}
                             </span>
                           </td>
@@ -486,13 +502,13 @@ export default function App() {
                             <div className="flex justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                               <button 
                                 onClick={() => handleEdit(entry)}
-                                className="p-1.5 text-zinc-600 hover:text-emerald-500 hover:bg-emerald-500/5 rounded-md transition-all"
+                                className="p-1.5 text-zinc-600 dark:text-zinc-400 hover:text-emerald-500 hover:bg-emerald-500/5 rounded-md transition-all"
                               >
                                 <Edit2 className="w-3.5 h-3.5" />
                               </button>
                               <button 
                                 onClick={() => handleDelete(entry.date)}
-                                className="p-1.5 text-zinc-600 hover:text-rose-500 hover:bg-rose-500/5 rounded-md transition-all"
+                                className="p-1.5 text-zinc-600 dark:text-zinc-400 hover:text-rose-500 hover:bg-rose-500/5 rounded-md transition-all"
                               >
                                 <Trash2 className="w-3.5 h-3.5" />
                               </button>
@@ -513,23 +529,23 @@ export default function App() {
               initial={{ opacity: 0, y: 10 }}
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -10 }}
-              className="bg-[#121214] border border-white/[0.04] rounded-2xl p-8"
+              className="bg-white dark:bg-[#121214] border border-black/[0.04] dark:border-white/[0.04] rounded-2xl p-8"
             >
               <div className="flex justify-between items-center mb-10">
-                <h2 className="text-sm font-semibold uppercase tracking-widest text-zinc-100 flex items-center gap-2">
+                <h2 className="text-sm font-semibold uppercase tracking-widest text-zinc-900 dark:text-zinc-100 flex items-center gap-2">
                   <CalendarDays className="w-4 h-4 text-emerald-500" />
                   Calendário
                 </h2>
-                <div className="flex items-center gap-4 text-xs font-bold text-zinc-500 uppercase tracking-widest">
-                  <button className="p-1.5 hover:bg-white/5 rounded-lg"><ChevronLeft className="w-4 h-4" /></button>
+                <div className="flex items-center gap-4 text-xs font-bold text-zinc-500 dark:text-zinc-500 uppercase tracking-widest">
+                  <button className="p-1.5 hover:bg-black/5 dark:bg-white/5 rounded-lg"><ChevronLeft className="w-4 h-4" /></button>
                   <span>Março 2026</span>
-                  <button className="p-1.5 hover:bg-white/5 rounded-lg"><ChevronRight className="w-4 h-4" /></button>
+                  <button className="p-1.5 hover:bg-black/5 dark:bg-white/5 rounded-lg"><ChevronRight className="w-4 h-4" /></button>
                 </div>
               </div>
 
               <div className="grid grid-cols-7 gap-3">
                 {['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'].map(day => (
-                  <div key={day} className="text-center text-[10px] font-bold text-zinc-600 uppercase tracking-widest mb-2">
+                  <div key={day} className="text-center text-[10px] font-bold text-zinc-600 dark:text-zinc-400 uppercase tracking-widest mb-2">
                     {day}
                   </div>
                 ))}
@@ -550,12 +566,12 @@ export default function App() {
                   return (
                     <div 
                       key={day} 
-                      className={`aspect-square rounded-xl border p-2 flex flex-col justify-between transition-all hover:bg-white/[0.02]
-                        ${entry ? 'bg-white/[0.02] border-white/[0.06]' : 'bg-transparent border-white/[0.03]'}
+                      className={`aspect-square rounded-xl border p-2 flex flex-col justify-between transition-all hover:bg-black/[0.02] dark:bg-white/[0.02]
+                        ${entry ? 'bg-black/[0.02] dark:bg-white/[0.02] border-black/[0.06] dark:border-white/[0.06]' : 'bg-transparent border-black/[0.03] dark:border-white/[0.03]'}
                         ${isWeekend || holiday ? 'bg-emerald-500/[0.03] border-emerald-500/10' : ''}
                       `}
                     >
-                      <span className={`text-[10px] font-bold ${isWeekend || holiday ? 'text-emerald-500/60' : 'text-zinc-600'}`}>
+                      <span className={`text-[10px] font-bold ${isWeekend || holiday ? 'text-emerald-500/60' : 'text-zinc-600 dark:text-zinc-400'}`}>
                         {day}
                       </span>
                       {entry && (
@@ -579,8 +595,8 @@ export default function App() {
               className="space-y-6"
             >
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div className="bg-[#121214] border border-white/[0.04] rounded-2xl p-8">
-                  <h3 className="text-sm font-semibold uppercase tracking-widest text-zinc-100 mb-8 flex items-center gap-2">
+                <div className="bg-white dark:bg-[#121214] border border-black/[0.04] dark:border-white/[0.04] rounded-2xl p-8">
+                  <h3 className="text-sm font-semibold uppercase tracking-widest text-zinc-900 dark:text-zinc-100 mb-8 flex items-center gap-2">
                     <Activity className="w-4 h-4 text-emerald-500" />
                     Fluxo de Saldo
                   </h3>
@@ -618,8 +634,8 @@ export default function App() {
                   </div>
                 </div>
 
-                <div className="bg-[#121214] border border-white/[0.04] rounded-2xl p-8">
-                  <h3 className="text-sm font-semibold uppercase tracking-widest text-zinc-100 mb-8 flex items-center gap-2">
+                <div className="bg-white dark:bg-[#121214] border border-black/[0.04] dark:border-white/[0.04] rounded-2xl p-8">
+                  <h3 className="text-sm font-semibold uppercase tracking-widest text-zinc-900 dark:text-zinc-100 mb-8 flex items-center gap-2">
                     <Moon className="w-4 h-4 text-indigo-400" />
                     Composição
                   </h3>
@@ -650,13 +666,13 @@ export default function App() {
                     </ResponsiveContainer>
                   </div>
                   <div className="flex justify-center gap-6 mt-4">
-                    <div className="flex items-center gap-2 text-[10px] font-bold text-zinc-600 uppercase tracking-widest">
+                    <div className="flex items-center gap-2 text-[10px] font-bold text-zinc-600 dark:text-zinc-400 uppercase tracking-widest">
                       <div className="w-2 h-2 rounded-full bg-emerald-500/60" /> Normal
                     </div>
-                    <div className="flex items-center gap-2 text-[10px] font-bold text-zinc-600 uppercase tracking-widest">
+                    <div className="flex items-center gap-2 text-[10px] font-bold text-zinc-600 dark:text-zinc-400 uppercase tracking-widest">
                       <div className="w-2 h-2 rounded-full bg-blue-500/60" /> Extra
                     </div>
-                    <div className="flex items-center gap-2 text-[10px] font-bold text-zinc-600 uppercase tracking-widest">
+                    <div className="flex items-center gap-2 text-[10px] font-bold text-zinc-600 dark:text-zinc-400 uppercase tracking-widest">
                       <div className="w-2 h-2 rounded-full bg-indigo-400/60" /> Noturna
                     </div>
                   </div>
@@ -674,59 +690,59 @@ export default function App() {
             <motion.div 
               initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
               onClick={() => setIsModalOpen(false)}
-              className="absolute inset-0 bg-black/80 backdrop-blur-sm"
+              className="absolute inset-0 bg-black/20 dark:bg-black/80 backdrop-blur-sm"
             />
             <motion.div 
               initial={{ scale: 0.9, opacity: 0, y: 20 }} animate={{ scale: 1, opacity: 1, y: 0 }} exit={{ scale: 0.9, opacity: 0, y: 20 }}
-              className="relative bg-[#121212] border border-white/10 w-full max-w-lg rounded-[2.5rem] shadow-2xl overflow-hidden"
+              className="relative bg-white dark:bg-[#121212] border border-black/10 dark:border-white/10 w-full max-w-lg rounded-[2.5rem] shadow-2xl overflow-hidden"
             >
-              <div className="p-8 border-b border-white/5 bg-white/5">
+              <div className="p-8 border-b border-black/5 dark:border-white/5 bg-black/5 dark:bg-white/5">
                 <h2 className="text-2xl font-bold">{isEditing ? 'Editar Marcação' : 'Registrar Marcação'}</h2>
-                <p className="text-zinc-500 text-sm mt-1">
+                <p className="text-zinc-500 dark:text-zinc-500 text-sm mt-1">
                   {isEditing ? 'Ajuste os horários da marcação existente.' : 'Preencha os horários do dia selecionado.'}
                 </p>
               </div>
               
               <form onSubmit={handleSave} className="p-8 space-y-6 max-h-[70vh] overflow-y-auto custom-scrollbar">
                 <div className="space-y-2">
-                  <label className="text-xs font-bold text-zinc-500 uppercase tracking-widest">Data</label>
+                  <label className="text-xs font-bold text-zinc-500 dark:text-zinc-500 uppercase tracking-widest">Data</label>
                   <input 
                     type="date" 
                     required
                     value={formData.date}
                     onChange={e => setFormData({...formData, date: e.target.value})}
-                    className="w-full bg-white/5 border border-white/10 rounded-2xl px-4 py-3 focus:outline-none focus:border-emerald-500/50 transition-colors text-white"
+                    className="w-full bg-black/5 dark:bg-white/5 border border-black/10 dark:border-white/10 rounded-2xl px-4 py-3 focus:outline-none focus:border-emerald-500/50 transition-colors text-black dark:text-white"
                   />
                 </div>
 
                 {[1, 2, 3, 4, 5].map(i => (
-                  <div key={i} className="grid grid-cols-2 gap-4 p-4 bg-white/5 rounded-2xl border border-white/5">
+                  <div key={i} className="grid grid-cols-2 gap-4 p-4 bg-black/5 dark:bg-white/5 rounded-2xl border border-black/5 dark:border-white/5">
                     <div className="space-y-2">
-                      <label className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest">Entrada {i}</label>
+                      <label className="text-[10px] font-bold text-zinc-500 dark:text-zinc-500 uppercase tracking-widest">Entrada {i}</label>
                       <input 
                         type="time" 
                         value={(formData as any)[`entry_${i}`]}
                         onChange={e => setFormData({...formData, [`entry_${i}`]: e.target.value})}
-                        className="w-full bg-white/5 border border-white/10 rounded-xl px-3 py-2 focus:outline-none focus:border-emerald-500/50 transition-colors text-white text-sm"
+                        className="w-full bg-black/5 dark:bg-white/5 border border-black/10 dark:border-white/10 rounded-xl px-3 py-2 focus:outline-none focus:border-emerald-500/50 transition-colors text-black dark:text-white text-sm"
                       />
                     </div>
                     <div className="space-y-2">
-                      <label className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest">Saída {i}</label>
+                      <label className="text-[10px] font-bold text-zinc-500 dark:text-zinc-500 uppercase tracking-widest">Saída {i}</label>
                       <input 
                         type="time" 
                         value={(formData as any)[`exit_${i}`]}
                         onChange={e => setFormData({...formData, [`exit_${i}`]: e.target.value})}
-                        className="w-full bg-white/5 border border-white/10 rounded-xl px-3 py-2 focus:outline-none focus:border-emerald-500/50 transition-colors text-white text-sm"
+                        className="w-full bg-black/5 dark:bg-white/5 border border-black/10 dark:border-white/10 rounded-xl px-3 py-2 focus:outline-none focus:border-emerald-500/50 transition-colors text-black dark:text-white text-sm"
                       />
                     </div>
                   </div>
                 ))}
 
-                <div className="pt-4 flex gap-3 sticky bottom-0 bg-[#121212] py-4">
+                <div className="pt-4 flex gap-3 sticky bottom-0 bg-white dark:bg-[#121212] py-4">
                   <button 
                     type="button"
                     onClick={() => setIsModalOpen(false)}
-                    className="flex-1 px-6 py-4 rounded-2xl font-bold text-zinc-400 hover:text-white hover:bg-white/5 transition-all"
+                    className="flex-1 px-6 py-4 rounded-2xl font-bold text-zinc-600 dark:text-zinc-400 hover:text-black dark:text-white hover:bg-black/5 dark:bg-white/5 transition-all"
                   >
                     Cancelar
                   </button>
@@ -750,16 +766,16 @@ export default function App() {
             <motion.div 
               initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
               onClick={() => setIsSettingsOpen(false)}
-              className="absolute inset-0 bg-black/80 backdrop-blur-sm"
+              className="absolute inset-0 bg-black/20 dark:bg-black/80 backdrop-blur-sm"
             />
             <motion.div 
               initial={{ scale: 0.9, opacity: 0, y: 20 }} animate={{ scale: 1, opacity: 1, y: 0 }} exit={{ scale: 0.9, opacity: 0, y: 20 }}
-              className="relative bg-[#121212] border border-white/10 w-full max-w-lg rounded-[2.5rem] shadow-2xl overflow-hidden"
+              className="relative bg-white dark:bg-[#121212] border border-black/10 dark:border-white/10 w-full max-w-lg rounded-[2.5rem] shadow-2xl overflow-hidden"
             >
-              <div className="p-8 border-b border-white/5 bg-white/5 flex justify-between items-center">
+              <div className="p-8 border-b border-black/5 dark:border-white/5 bg-black/5 dark:bg-white/5 flex justify-between items-center">
                 <div>
                   <h2 className="text-2xl font-bold">Configurações</h2>
-                  <p className="text-zinc-500 text-sm mt-1">Ajuste os parâmetros do seu banco de horas.</p>
+                  <p className="text-zinc-500 dark:text-zinc-500 text-sm mt-1">Ajuste os parâmetros do seu banco de horas.</p>
                 </div>
                 <button 
                   onClick={syncHolidays}
@@ -772,7 +788,7 @@ export default function App() {
               
               <form onSubmit={handleSaveSettings} className="p-8 space-y-6">
                 <div className="space-y-2">
-                  <label className="text-xs font-bold text-zinc-500 uppercase tracking-widest flex items-center gap-2">
+                  <label className="text-xs font-bold text-zinc-500 dark:text-zinc-500 uppercase tracking-widest flex items-center gap-2">
                     <History className="w-4 h-4" />
                     Saldo do Mês Anterior (Minutos)
                   </label>
@@ -781,14 +797,14 @@ export default function App() {
                       type="number" 
                       value={previousBalance}
                       onChange={e => setPreviousBalance(parseInt(e.target.value || '0'))}
-                      className="flex-1 bg-white/5 border border-white/10 rounded-2xl px-4 py-3 focus:outline-none focus:border-emerald-500/50 transition-colors text-white font-mono"
+                      className="flex-1 bg-black/5 dark:bg-white/5 border border-black/10 dark:border-white/10 rounded-2xl px-4 py-3 focus:outline-none focus:border-emerald-500/50 transition-colors text-black dark:text-white font-mono"
                       placeholder="Ex: 120 para +2h ou -60 para -1h"
                     />
-                    <div className="text-sm font-mono text-zinc-400 bg-white/5 px-4 py-3 rounded-2xl border border-white/10 min-w-[100px] text-center">
+                    <div className="text-sm font-mono text-zinc-600 dark:text-zinc-400 bg-black/5 dark:bg-white/5 px-4 py-3 rounded-2xl border border-black/10 dark:border-white/10 min-w-[100px] text-center">
                       {minutesToTime(previousBalance)}h
                     </div>
                   </div>
-                  <p className="text-[10px] text-zinc-500">
+                  <p className="text-[10px] text-zinc-500 dark:text-zinc-500">
                     Insira o saldo positivo ou negativo em minutos. Esse valor será somado ao total acumulado.
                   </p>
                 </div>
@@ -797,7 +813,7 @@ export default function App() {
                   <button 
                     type="button"
                     onClick={() => setIsSettingsOpen(false)}
-                    className="flex-1 px-6 py-4 rounded-2xl font-bold text-zinc-400 hover:text-white hover:bg-white/5 transition-all"
+                    className="flex-1 px-6 py-4 rounded-2xl font-bold text-zinc-600 dark:text-zinc-400 hover:text-black dark:text-white hover:bg-black/5 dark:bg-white/5 transition-all"
                   >
                     Cancelar
                   </button>
