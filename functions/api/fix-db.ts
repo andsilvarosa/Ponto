@@ -41,7 +41,7 @@ export async function onRequestGet(context: any) {
     try {
       await db.execute(sql`
         DELETE FROM time_entries a USING time_entries b
-        WHERE a.date = b.date AND a.ctid > b.ctid
+        WHERE a.matricula = b.matricula AND a.date = b.date AND a.ctid > b.ctid
       `);
       logs.push("DELETE duplicatas executado com sucesso.");
     } catch (e: any) {
@@ -49,17 +49,12 @@ export async function onRequestGet(context: any) {
     }
 
     try {
-      await db.execute(sql`ALTER TABLE time_entries ADD PRIMARY KEY (date)`);
+      await db.execute(sql`ALTER TABLE time_entries DROP CONSTRAINT IF EXISTS time_entries_pkey`);
+      await db.execute(sql`ALTER TABLE time_entries DROP CONSTRAINT IF EXISTS time_entries_date_unique`);
+      await db.execute(sql`ALTER TABLE time_entries ADD PRIMARY KEY (matricula, date)`);
       logs.push("ADD PRIMARY KEY executado com sucesso.");
     } catch (e: any) {
       logs.push("Erro no ADD PRIMARY KEY: " + e.message);
-      
-      try {
-        await db.execute(sql`ALTER TABLE time_entries ADD CONSTRAINT time_entries_date_unique UNIQUE (date)`);
-        logs.push("ADD CONSTRAINT UNIQUE executado com sucesso.");
-      } catch (e2: any) {
-        logs.push("Erro no ADD CONSTRAINT UNIQUE: " + e2.message);
-      }
     }
 
     try {

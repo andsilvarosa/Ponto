@@ -185,8 +185,17 @@ export async function onRequestPost(context: any) {
       try {
         await db.execute(sql`ALTER TABLE time_entries DROP CONSTRAINT IF EXISTS time_entries_pkey`);
         await db.execute(sql`ALTER TABLE time_entries DROP CONSTRAINT IF EXISTS time_entries_date_unique`);
+        
+        // Remove duplicates before adding primary key
+        await db.execute(sql`
+          DELETE FROM time_entries a USING time_entries b
+          WHERE a.matricula = b.matricula AND a.date = b.date AND a.ctid > b.ctid
+        `);
+        
         await db.execute(sql`ALTER TABLE time_entries ADD PRIMARY KEY (matricula, date)`);
-      } catch (e) {}
+      } catch (e) {
+        console.error("Erro ao recriar primary key:", e);
+      }
     } catch (e: any) {
       console.error("Erro ao configurar tabela:", e);
     }
@@ -265,7 +274,7 @@ export async function onRequestPost(context: any) {
           }
           
           prevPunches.push(orphanedPunch);
-          prevPunches.sort(); // Garante que fica na ordem certa
+          // Não ordenamos aqui para que a marcação da madrugada (ex: 00:33) fique no final do array do dia anterior
           mapaMarcacoes.set(prevDateStr, prevPunches);
           mapaMarcacoes.set(currentDate, currentPunches);
         }
@@ -275,7 +284,7 @@ export async function onRequestPost(context: any) {
     let savedCount = 0;
     const dbErrors: string[] = [];
     for (const [date, punches] of Array.from(mapaMarcacoes.entries())) {
-      punches.sort();
+      // Não ordenamos novamente aqui, pois já foi ordenado no início e as madrugadas foram jogadas pro final
       const marcacao: any = {
         matricula: matricula,
         date: date,
