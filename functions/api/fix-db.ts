@@ -13,13 +13,16 @@ export async function onRequestGet(context: any) {
     try {
       await db.execute(sql`
         CREATE TABLE IF NOT EXISTS time_entries (
-          date TEXT PRIMARY KEY,
+          matricula TEXT NOT NULL DEFAULT '000000',
+          date TEXT NOT NULL,
           entry_1 TEXT, exit_1 TEXT,
           entry_2 TEXT, exit_2 TEXT,
           entry_3 TEXT, exit_3 TEXT,
           entry_4 TEXT, exit_4 TEXT,
           entry_5 TEXT, exit_5 TEXT,
-          created_at TIMESTAMP DEFAULT NOW()
+          is_manual BOOLEAN DEFAULT FALSE,
+          created_at TIMESTAMP DEFAULT NOW(),
+          PRIMARY KEY (matricula, date)
         )
       `);
       logs.push("CREATE TABLE executado com sucesso.");
@@ -68,13 +71,16 @@ export async function onRequestGet(context: any) {
         await db.execute(sql`DROP TABLE IF EXISTS time_entries`);
         await db.execute(sql`
           CREATE TABLE time_entries (
-            date TEXT PRIMARY KEY,
+            matricula TEXT NOT NULL DEFAULT '000000',
+            date TEXT NOT NULL,
             entry_1 TEXT, exit_1 TEXT,
             entry_2 TEXT, exit_2 TEXT,
             entry_3 TEXT, exit_3 TEXT,
             entry_4 TEXT, exit_4 TEXT,
             entry_5 TEXT, exit_5 TEXT,
-            created_at TIMESTAMP DEFAULT NOW()
+            is_manual BOOLEAN DEFAULT FALSE,
+            created_at TIMESTAMP DEFAULT NOW(),
+            PRIMARY KEY (matricula, date)
           )
         `);
         logs.push("Tabela recriada com sucesso com PRIMARY KEY.");

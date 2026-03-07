@@ -14,13 +14,15 @@ async function ensureTableExists(db: any) {
         entry_3 TEXT, exit_3 TEXT,
         entry_4 TEXT, exit_4 TEXT,
         entry_5 TEXT, exit_5 TEXT,
+        is_manual BOOLEAN DEFAULT FALSE,
         created_at TIMESTAMP DEFAULT NOW(),
         PRIMARY KEY (matricula, date)
       )
     `);
     
-    // Add matricula column if it doesn't exist
+    // Add columns if they don't exist
     await db.execute(sql`ALTER TABLE time_entries ADD COLUMN IF NOT EXISTS matricula TEXT NOT NULL DEFAULT '000000'`);
+    await db.execute(sql`ALTER TABLE time_entries ADD COLUMN IF NOT EXISTS is_manual BOOLEAN DEFAULT FALSE`);
     
     // Drop old primary key and add new composite primary key
     try {

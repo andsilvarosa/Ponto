@@ -169,13 +169,15 @@ export async function onRequestPost(context: any) {
           entry_3 TEXT, exit_3 TEXT,
           entry_4 TEXT, exit_4 TEXT,
           entry_5 TEXT, exit_5 TEXT,
+          is_manual BOOLEAN DEFAULT FALSE,
           created_at TIMESTAMP DEFAULT NOW(),
           PRIMARY KEY (matricula, date)
         )
       `);
       
-      // Add matricula column if it doesn't exist
+      // Add columns if they don't exist
       await db.execute(sql`ALTER TABLE time_entries ADD COLUMN IF NOT EXISTS matricula TEXT NOT NULL DEFAULT '000000'`);
+      await db.execute(sql`ALTER TABLE time_entries ADD COLUMN IF NOT EXISTS is_manual BOOLEAN DEFAULT FALSE`);
       
       // Drop old primary key and add new composite primary key
       try {
@@ -233,6 +235,7 @@ export async function onRequestPost(context: any) {
             entry_3 = EXCLUDED.entry_3, exit_3 = EXCLUDED.exit_3,
             entry_4 = EXCLUDED.entry_4, exit_4 = EXCLUDED.exit_4,
             entry_5 = EXCLUDED.entry_5, exit_5 = EXCLUDED.exit_5
+          WHERE time_entries.is_manual IS NOT TRUE
         `);
         savedCount++;
       } catch (e: any) {
