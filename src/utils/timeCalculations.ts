@@ -12,6 +12,20 @@ export const JORNADA_PADRAO_MINUTOS = 440; // 07:20:00
 export const FATOR_NOTURNO = 60 / 52.5; // 1.142857...
 
 /**
+ * Converte string "HH:mm" (com sinal opcional) para minutos totais.
+ */
+export function timeStrToMinutes(timeStr: string): number {
+  if (!timeStr) return 0;
+  const isNegative = timeStr.startsWith('-');
+  const cleanStr = timeStr.replace('-', '');
+  const parts = cleanStr.split(':');
+  const hours = parseInt(parts[0] || '0', 10);
+  const minutes = parseInt(parts[1] || '0', 10);
+  const total = (isNaN(hours) ? 0 : hours) * 60 + (isNaN(minutes) ? 0 : minutes);
+  return isNegative ? -total : total;
+}
+
+/**
  * Converte string "HH:mm" para minutos totais desde o início do dia.
  */
 export function timeToMinutes(timeStr: string | null): number | null {
