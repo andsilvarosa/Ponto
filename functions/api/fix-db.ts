@@ -21,6 +21,7 @@ export async function onRequestGet(context: any) {
           entry_4 TEXT, exit_4 TEXT,
           entry_5 TEXT, exit_5 TEXT,
           is_manual BOOLEAN DEFAULT FALSE,
+          is_extra BOOLEAN DEFAULT FALSE,
           created_at TIMESTAMP DEFAULT NOW(),
           PRIMARY KEY (matricula, date)
         )
@@ -79,6 +80,7 @@ export async function onRequestGet(context: any) {
             entry_4 TEXT, exit_4 TEXT,
             entry_5 TEXT, exit_5 TEXT,
             is_manual BOOLEAN DEFAULT FALSE,
+            is_extra BOOLEAN DEFAULT FALSE,
             created_at TIMESTAMP DEFAULT NOW(),
             PRIMARY KEY (matricula, date)
           )

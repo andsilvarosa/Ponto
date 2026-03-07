@@ -15,6 +15,7 @@ async function ensureTableExists(db: any) {
         entry_4 TEXT, exit_4 TEXT,
         entry_5 TEXT, exit_5 TEXT,
         is_manual BOOLEAN DEFAULT FALSE,
+        is_extra BOOLEAN DEFAULT FALSE,
         created_at TIMESTAMP DEFAULT NOW(),
         PRIMARY KEY (matricula, date)
       )
@@ -23,6 +24,7 @@ async function ensureTableExists(db: any) {
     // Add columns if they don't exist
     await db.execute(sql`ALTER TABLE time_entries ADD COLUMN IF NOT EXISTS matricula TEXT NOT NULL DEFAULT '000000'`);
     await db.execute(sql`ALTER TABLE time_entries ADD COLUMN IF NOT EXISTS is_manual BOOLEAN DEFAULT FALSE`);
+    await db.execute(sql`ALTER TABLE time_entries ADD COLUMN IF NOT EXISTS is_extra BOOLEAN DEFAULT FALSE`);
     
     // Drop old primary key and add new composite primary key
     try {
@@ -91,13 +93,15 @@ export async function onRequestPost(context: any) {
       cleanedData.entry_5, cleanedData.exit_5
     ];
     
+    const isExtra = data.is_extra === true;
+
     await db.execute(sql`
       INSERT INTO time_entries (
         matricula, date, 
-        entry_1, exit_1, entry_2, exit_2, entry_3, exit_3, entry_4, exit_4, entry_5, exit_5, is_manual
+        entry_1, exit_1, entry_2, exit_2, entry_3, exit_3, entry_4, exit_4, entry_5, exit_5, is_manual, is_extra
       ) VALUES (
         ${matricula}, ${cleanedData.date},
-        ${entriesArr[0]}, ${entriesArr[1]}, ${entriesArr[2]}, ${entriesArr[3]}, ${entriesArr[4]}, ${entriesArr[5]}, ${entriesArr[6]}, ${entriesArr[7]}, ${entriesArr[8]}, ${entriesArr[9]}, TRUE
+        ${entriesArr[0]}, ${entriesArr[1]}, ${entriesArr[2]}, ${entriesArr[3]}, ${entriesArr[4]}, ${entriesArr[5]}, ${entriesArr[6]}, ${entriesArr[7]}, ${entriesArr[8]}, ${entriesArr[9]}, TRUE, ${isExtra}
       )
       ON CONFLICT (matricula, date) DO UPDATE SET
         entry_1 = EXCLUDED.entry_1, exit_1 = EXCLUDED.exit_1,
@@ -105,7 +109,8 @@ export async function onRequestPost(context: any) {
         entry_3 = EXCLUDED.entry_3, exit_3 = EXCLUDED.exit_3,
         entry_4 = EXCLUDED.entry_4, exit_4 = EXCLUDED.exit_4,
         entry_5 = EXCLUDED.entry_5, exit_5 = EXCLUDED.exit_5,
-        is_manual = TRUE
+        is_manual = TRUE,
+        is_extra = EXCLUDED.is_extra
     `);
 
     return Response.json({ success: true });

@@ -20,6 +20,7 @@ export const timeEntries = pgTable("time_entries", {
   entry_5: text("entry_5"),
   exit_5: text("exit_5"),
   is_manual: boolean("is_manual").default(false),
+  is_extra: boolean("is_extra").default(false),
   createdAt: timestamp("created_at").defaultNow(),
 }, (table) => {
   return {

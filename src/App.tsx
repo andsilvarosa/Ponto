@@ -49,6 +49,7 @@ interface TimeEntry {
   exit_4: string;
   entry_5: string;
   exit_5: string;
+  is_extra?: boolean;
 }
 
 interface Holiday {
@@ -94,6 +95,7 @@ export default function App() {
     exit_4: '',
     entry_5: '',
     exit_5: '',
+    is_extra: false,
   });
 
   useEffect(() => {
@@ -236,6 +238,7 @@ export default function App() {
       exit_4: '',
       entry_5: '',
       exit_5: '',
+      is_extra: false,
     });
     setIsEditing(false);
     setIsModalOpen(true);
@@ -311,7 +314,7 @@ export default function App() {
       const { isWeekend, holiday } = getDayStatus(entry.date);
       const entriesArr = [entry.entry_1, entry.entry_2, entry.entry_3, entry.entry_4, entry.entry_5];
       const exitsArr = [entry.exit_1, entry.exit_2, entry.exit_3, entry.exit_4, entry.exit_5];
-      const result = calculateDay(entriesArr, exitsArr, isWeekend || !!holiday, dailyWorkHours);
+      const result = calculateDay(entriesArr, exitsArr, isWeekend || !!holiday, dailyWorkHours, entry.is_extra);
       totalBalance += result.balance;
       totalNight += result.nightMinutesFicta;
       if (entry.date === todayStr) {
@@ -542,7 +545,7 @@ export default function App() {
                       const { isWeekend, holiday } = getDayStatus(entry.date);
                       const entriesArr = [entry.entry_1, entry.entry_2, entry.entry_3, entry.entry_4, entry.entry_5];
                       const exitsArr = [entry.exit_1, entry.exit_2, entry.exit_3, entry.exit_4, entry.exit_5];
-                      const result = calculateDay(entriesArr, exitsArr, isWeekend || !!holiday, dailyWorkHours);
+                      const result = calculateDay(entriesArr, exitsArr, isWeekend || !!holiday, dailyWorkHours, entry.is_extra);
                       
                       return (
                         <tr 
@@ -647,7 +650,7 @@ export default function App() {
                   if (entry) {
                     const entriesArr = [entry.entry_1, entry.entry_2, entry.entry_3, entry.entry_4, entry.entry_5];
                     const exitsArr = [entry.exit_1, entry.exit_2, entry.exit_3, entry.exit_4, entry.exit_5];
-                    const result = calculateDay(entriesArr, exitsArr, isWeekend || !!holiday, dailyWorkHours);
+                    const result = calculateDay(entriesArr, exitsArr, isWeekend || !!holiday, dailyWorkHours, entry.is_extra);
                     balance = result.balance;
                   }
 
@@ -707,13 +710,13 @@ export default function App() {
                           const { isWeekend, holiday } = getDayStatus(entry.date);
                           const entriesArr = [entry.entry_1, entry.entry_2, entry.entry_3, entry.entry_4, entry.entry_5];
                           const exitsArr = [entry.exit_1, entry.exit_2, entry.exit_3, entry.exit_4, entry.exit_5];
-                          return calculateDay(entriesArr, exitsArr, isWeekend || !!holiday, dailyWorkHours).balance;
+                          return calculateDay(entriesArr, exitsArr, isWeekend || !!holiday, dailyWorkHours, entry.is_extra).balance;
                         }} name="Saldo (min)">
                           {(entries || []).slice().reverse().map((entry, index) => {
                             const { isWeekend, holiday } = getDayStatus(entry.date);
                             const entriesArr = [entry.entry_1, entry.entry_2, entry.entry_3, entry.entry_4, entry.entry_5];
                             const exitsArr = [entry.exit_1, entry.exit_2, entry.exit_3, entry.exit_4, entry.exit_5];
-                            const balance = calculateDay(entriesArr, exitsArr, isWeekend || !!holiday, dailyWorkHours).balance;
+                            const balance = calculateDay(entriesArr, exitsArr, isWeekend || !!holiday, dailyWorkHours, entry.is_extra).balance;
                             return <Cell key={`cell-${index}`} fill={balance >= 0 ? '#10b98180' : '#f43f5e80'} />;
                           })}
                         </Bar>
@@ -825,6 +828,19 @@ export default function App() {
                     </div>
                   </div>
                 ))}
+
+                <div className="flex items-center gap-3 p-4 bg-black/5 dark:bg-white/5 rounded-2xl border border-black/5 dark:border-white/5">
+                  <input
+                    type="checkbox"
+                    id="is_extra"
+                    checked={formData.is_extra || false}
+                    onChange={e => setFormData({...formData, is_extra: e.target.checked})}
+                    className="w-5 h-5 rounded border-black/20 dark:border-white/20 text-emerald-500 focus:ring-emerald-500/50 bg-transparent"
+                  />
+                  <label htmlFor="is_extra" className="text-sm font-medium text-zinc-700 dark:text-zinc-300 cursor-pointer">
+                    Marcar como Hora Extra (Folga trabalhada)
+                  </label>
+                </div>
 
                 <div className="pt-4 flex gap-3 sticky bottom-0 bg-white dark:bg-[#121212] py-4">
                   <button 
