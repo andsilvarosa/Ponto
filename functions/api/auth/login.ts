@@ -6,40 +6,40 @@ import { eq } from "drizzle-orm";
 import bcrypt from "bcryptjs";
 
 export async function onRequestPost(context: any) {
-  if (!context.env.DATABASE_URL) {
-    return Response.json({ error: "DATABASE_URL não configurada" }, { status: 500 });
-  }
-
-  const sqlClient = neon(context.env.DATABASE_URL);
-  const db = drizzle(sqlClient);
-
+  let step = "init";
   try {
-    const body = await context.request.json();
+    if (!context.env.DATABASE_URL) {
+      return Response.json({ error: "DATABASE_URL não configurada" }, { status: 500 });
+    }
+
+    step = "connect_db";
+    const sqlClient = neon(context.env.DATABASE_URL);
+    const db = drizzle(sqlClient);
+
+    step = "parse_body";
+    let body;
+    try {
+      body = await context.request.json();
+    } catch (e) {
+      return Response.json({ error: "Corpo da requisição inválido" }, { status: 400 });
+    }
     const { matricula, password } = body;
     
-    console.log("Tentativa de login para matricula:", matricula);
-
     if (!matricula || !password) {
       return Response.json({ error: "Matrícula e senha são obrigatórios" }, { status: 400 });
     }
 
-    // Ensure table exists
-    await db.execute(sql`
-      CREATE TABLE IF NOT EXISTS users (
-        matricula TEXT PRIMARY KEY,
-        password TEXT NOT NULL,
-        name TEXT,
-        created_at TIMESTAMP DEFAULT NOW()
-      )
-    `);
-
-    const user = await db.select().from(users).where(eq(users.matricula, matricula)).limit(1);
+    step = "fetch_user";
+    const userResult = await db.execute(sql`SELECT matricula, password, name FROM users WHERE matricula = ${matricula} LIMIT 1`);
     
-    if (!user || user.length === 0) {
+    if (userResult.rows.length === 0) {
       return Response.json({ error: "Usuário não encontrado" }, { status: 404 });
     }
 
-    const isPasswordValid = await bcrypt.compare(password, user[0].password);
+    const user = userResult.rows[0];
+
+    step = "compare_password";
+    const isPasswordValid = await bcrypt.compare(password, user.password as string);
     if (!isPasswordValid) {
       return Response.json({ error: "Senha incorreta" }, { status: 401 });
     }
@@ -47,16 +47,17 @@ export async function onRequestPost(context: any) {
     return Response.json({ 
       success: true, 
       user: { 
-        matricula: user[0].matricula, 
-        name: user[0].name 
+        matricula: user.matricula, 
+        name: user.name 
       } 
     });
   } catch (error: any) {
-    console.error("Erro detalhado no login:", error);
+    console.error(`Erro no login (step: ${step}):`, error);
     return Response.json({ 
       error: "Erro ao realizar login", 
+      step,
       details: error.message,
-      stack: process.env.NODE_ENV === 'development' ? error.stack : undefined
+      stack: error.stack
     }, { status: 500 });
   }
 }

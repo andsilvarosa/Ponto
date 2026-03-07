@@ -354,7 +354,10 @@ export default function App() {
       });
       
       const data = await response.json();
-      if (!response.ok) throw new Error(data.error || 'Erro ao realizar login');
+      if (!response.ok) {
+        const errorMsg = data.details ? `${data.error} (Step: ${data.step}): ${data.details}` : (data.error || 'Erro ao realizar login');
+        throw new Error(errorMsg);
+      }
 
       localStorage.setItem('matricula', matricula.trim());
       setIsLoggedIn(true);
@@ -377,7 +380,10 @@ export default function App() {
       });
       
       const data = await response.json();
-      if (!response.ok) throw new Error(data.error || 'Erro ao cadastrar');
+      if (!response.ok) {
+        const errorMsg = data.details ? `${data.error} (Step: ${data.step}): ${data.details}` : (data.error || 'Erro ao cadastrar');
+        throw new Error(errorMsg);
+      }
 
       alert('Cadastro realizado com sucesso! Agora você pode entrar.');
       setIsRegistering(false);
