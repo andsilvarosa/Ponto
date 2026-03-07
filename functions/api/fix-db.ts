@@ -39,6 +39,21 @@ export async function onRequestGet(context: any) {
     }
 
     try {
+      logs.push("Criando tabela de usuários...");
+      await db.execute(sql`
+        CREATE TABLE IF NOT EXISTS users (
+          matricula TEXT PRIMARY KEY,
+          password TEXT NOT NULL,
+          name TEXT,
+          created_at TIMESTAMP DEFAULT NOW()
+        )
+      `);
+      logs.push("Tabela de usuários criada com sucesso.");
+    } catch (e: any) {
+      logs.push("Erro ao criar tabela de usuários: " + e.message);
+    }
+
+    try {
       logs.push("Limpando dados e ajustando índices...");
       await db.execute(sql`UPDATE time_entries SET matricula = '000000' WHERE matricula IS NULL`);
       await db.execute(sql`ALTER TABLE time_entries ALTER COLUMN matricula SET NOT NULL`);

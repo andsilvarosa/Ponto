@@ -32,3 +32,10 @@ export const settings = pgTable("settings", {
   key: text("key").primaryKey(),
   value: text("value").notNull(),
 });
+
+export const users = pgTable("users", {
+  matricula: text("matricula").primaryKey(),
+  password: text("password").notNull(),
+  name: text("name"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
