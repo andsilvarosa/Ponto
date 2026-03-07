@@ -53,6 +53,16 @@ export async function onRequestPost(context: any) {
     if (eventValidation) formData.append('__EVENTVALIDATION', eventValidation);
     formData.append('txtMatricula', matricula);
 
+    // Tentar enviar o período do mês atual
+    const today = new Date();
+    const firstDay = new Date(today.getFullYear(), today.getMonth(), 1);
+    const formatDateBr = (d: Date) => `${String(d.getDate()).padStart(2, '0')}/${String(d.getMonth() + 1).padStart(2, '0')}/${d.getFullYear()}`;
+    
+    formData.append('txtDataInicial', formatDateBr(firstDay));
+    formData.append('txtDataFinal', formatDateBr(today));
+    formData.append('txtDataInicio', formatDateBr(firstDay)); // Tentativa com outro nome comum
+    formData.append('txtDataFim', formatDateBr(today));
+
     const postResponse = await fetch(url, {
       method: 'POST',
       headers: {
@@ -69,24 +79,32 @@ export async function onRequestPost(context: any) {
 
     // 3. Extração de dados da Tabela
     const dataAtual = new Date().toLocaleDateString('en-CA', { timeZone: 'America/Sao_Paulo' });
-    const punchesDoDia: string[] = [];
 
-    $('#Grid tr').each((index, element) => {
+    $('#Grid tr, table tr').each((index, element) => {
       const textoLinha = $(element).text().replace(/\s+/g, ' ').trim();
+      
+      // Procurar por uma data no formato DD/MM/YYYY
+      const matchData = textoLinha.match(/(\d{2})\/(\d{2})\/(\d{4})/);
+      let rowDate = dataAtual;
+      if (matchData) {
+        rowDate = `${matchData[3]}-${matchData[2]}-${matchData[1]}`; // YYYY-MM-DD
+      }
+
       const matchesHorario = textoLinha.match(/([0-2]?\d:[0-5]\d)/g);
       
       if (matchesHorario) {
+        const punchesDoDia: string[] = [];
         matchesHorario.forEach(h => {
           let [hora, min] = h.split(':');
           const hFormatada = `${hora.padStart(2, '0')}:${min}`;
           if (!punchesDoDia.includes(hFormatada)) punchesDoDia.push(hFormatada);
         });
+        
+        if (punchesDoDia.length > 0) {
+          mapaMarcacoes.set(rowDate, punchesDoDia);
+        }
       }
     });
-
-    if (punchesDoDia.length > 0) {
-      mapaMarcacoes.set(dataAtual, [...punchesDoDia]);
-    }
 
     // 4. Transformar e Guardar no Neon DB
     

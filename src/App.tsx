@@ -103,7 +103,10 @@ export default function App() {
 
   useEffect(() => {
     if (isLoggedIn) {
-      fetchData();
+      fetchData().then(() => {
+        // Auto sync in background on login
+        syncCompanyPonto(true);
+      });
     }
   }, [isLoggedIn]);
 
@@ -112,9 +115,9 @@ export default function App() {
     'x-matricula': matricula
   });
 
-  const fetchData = async () => {
+  const fetchData = async (isBackground = false) => {
     if (!matricula) return;
-    setLoading(true);
+    if (!isBackground) setLoading(true);
     try {
       const [entriesRes, settingsRes] = await Promise.all([
         fetch('/api/entries', { headers: { 'x-matricula': matricula } }),
@@ -139,7 +142,7 @@ export default function App() {
     } catch (err) {
       console.error('Erro ao buscar dados:', err);
     } finally {
-      setLoading(false);
+      if (!isBackground) setLoading(false);
     }
   };
 
@@ -247,8 +250,8 @@ export default function App() {
     }
   };
 
-  const syncCompanyPonto = async () => {
-    setIsSyncingCompany(true);
+  const syncCompanyPonto = async (isBackground = false) => {
+    if (!isBackground) setIsSyncingCompany(true);
     try {
       const response = await fetch('/api/sync-ponto-empresa', { 
         method: 'POST',
@@ -270,23 +273,23 @@ export default function App() {
           }
         }
         console.error(`Erro na sincronização:`, errorMsg);
-        alert(errorMsg);
+        if (!isBackground) alert(errorMsg);
         throw new Error(errorMsg);
       }
 
       const data = await response.json();
       
       if (data.success) {
-        alert(`${data.count} dias foram sincronizados do site da empresa!`);
-        fetchData(); // Atualiza a tela com os novos dados
+        if (!isBackground) alert(`${data.count} dias foram sincronizados do site da empresa!`);
+        if (data.count > 0) fetchData(true); // Atualiza a tela com os novos dados em background
       } else {
-        alert('Erro ao puxar dados da empresa: ' + data.error);
+        if (!isBackground) alert('Erro ao puxar dados da empresa: ' + data.error);
       }
     } catch (err: any) {
       console.error('Erro na requisição:', err);
-      alert('Erro ao sincronizar: ' + err.message);
+      if (!isBackground) alert('Erro ao sincronizar: ' + err.message);
     } finally {
-      setIsSyncingCompany(false);
+      if (!isBackground) setIsSyncingCompany(false);
     }
   };
 
