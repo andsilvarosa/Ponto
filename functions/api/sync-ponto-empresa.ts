@@ -200,6 +200,45 @@ export async function onRequestPost(context: any) {
       } catch (e) {}
     }
 
+    // Corrigir marcações de virada de noite (overnight shifts)
+    const sortedDates = Array.from(mapaMarcacoes.keys()).sort();
+    for (let i = 0; i < sortedDates.length - 1; i++) {
+      const currentDate = sortedDates[i];
+      const nextDate = sortedDates[i + 1];
+      
+      const currentPunches = mapaMarcacoes.get(currentDate);
+      const nextPunches = mapaMarcacoes.get(nextDate);
+      
+      if (currentPunches && nextPunches && currentPunches.length % 2 !== 0) {
+        // Verifica se nextDate é exatamente o dia seguinte
+        const curr = new Date(currentDate);
+        const next = new Date(nextDate);
+        const diffTime = Math.abs(next.getTime() - curr.getTime());
+        const diffDays = Math.round(diffTime / (1000 * 60 * 60 * 24));
+        
+        if (diffDays === 1 && nextPunches.length > 0) {
+          // Ordena as marcações do dia seguinte para pegar a primeira (mais cedo)
+          nextPunches.sort();
+          const firstPunchNextDay = nextPunches[0];
+          const lastPunchCurrentDay = currentPunches[currentPunches.length - 1];
+          
+          // Só move para o dia anterior se:
+          // 1. A marcação do dia seguinte for de madrugada/manhã (antes das 12:00)
+          // 2. A última marcação do dia atual for à tarde/noite (depois das 12:00)
+          // Isso evita puxar a entrada do próximo turno caso o funcionário tenha esquecido de bater a saída de um turno diurno
+          if (firstPunchNextDay && firstPunchNextDay < '12:00' && lastPunchCurrentDay >= '12:00') {
+            nextPunches.shift(); // Remove do dia seguinte
+            currentPunches.push(firstPunchNextDay); // Adiciona no dia atual
+            
+            // Atualiza o mapa. Não deletamos o nextDate mesmo se ficar vazio,
+            // para que o banco de dados seja atualizado com valores nulos (limpando o dia).
+            mapaMarcacoes.set(currentDate, currentPunches);
+            mapaMarcacoes.set(nextDate, nextPunches);
+          }
+        }
+      }
+    }
+
     let savedCount = 0;
     const dbErrors: string[] = [];
     for (const [date, punches] of Array.from(mapaMarcacoes.entries())) {
