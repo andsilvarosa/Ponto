@@ -1,5 +1,5 @@
 import { timeEntries } from "../../src/db/schema";
-import { sql } from "drizzle-orm";
+import { sql, eq, and } from "drizzle-orm";
 import { neon } from '@neondatabase/serverless';
 import { drizzle } from 'drizzle-orm/neon-http';
 import * as cheerio from 'cheerio';
@@ -218,51 +218,55 @@ export async function onRequestPost(context: any) {
       
       // Se a primeira marcação for de madrugada/manhã (antes das 09:00)
       if (firstPunch < '09:00') {
-        const currDateObj = new Date(currentDate);
+        const [year, month, day] = currentDate.split('-').map(Number);
+        const currDateObj = new Date(year, month - 1, day);
         currDateObj.setDate(currDateObj.getDate() - 1);
         const prevDateStr = `${currDateObj.getFullYear()}-${String(currDateObj.getMonth() + 1).padStart(2, '0')}-${String(currDateObj.getDate()).padStart(2, '0')}`;
-        
-        let isOrphaned = false;
         
         // Se tem mais de uma marcação, o gap para a próxima deve ser grande (ex: > 6 horas)
         // Isso garante que não vamos puxar uma entrada normal da manhã (ex: 08:00) 
         // só porque o dia anterior esqueceu de bater a saída.
-        let hasLargeGap = true;
+        let isOrphaned = false;
+        
         if (currentPunches.length > 1) {
           const secondPunch = currentPunches[1];
           const p1 = firstPunch.split(':');
           const p2 = secondPunch.split(':');
           const m1 = parseInt(p1[0], 10) * 60 + parseInt(p1[1], 10);
           const m2 = parseInt(p2[0], 10) * 60 + parseInt(p2[1], 10);
-          if (m2 - m1 <= 360) { // 6 horas
-            hasLargeGap = false;
-          }
-        }
-
-        if (hasLargeGap) {
-          if (mapaMarcacoes.has(prevDateStr)) {
-            const prevPunches = mapaMarcacoes.get(prevDateStr)!;
-            // Se o dia anterior tem número ímpar de marcações e a última foi à tarde/noite
-            if (prevPunches.length % 2 !== 0 && prevPunches[prevPunches.length - 1] >= '12:00') {
-              isOrphaned = true;
-            }
-          } else {
-            // Se não temos o dia anterior no mapa (ex: dia 1 do mês), assumimos que é órfã
+          if (m2 - m1 > 360) { // Gap maior que 6 horas
             isOrphaned = true;
           }
+        } else {
+          // Se só tem uma marcação e é de madrugada, é órfã com certeza
+          isOrphaned = true;
         }
-        
+
         if (isOrphaned) {
           const orphanedPunch = currentPunches.shift()!;
           
+          let prevPunches: string[] = [];
           if (mapaMarcacoes.has(prevDateStr)) {
-            const prevPunches = mapaMarcacoes.get(prevDateStr)!;
-            prevPunches.push(orphanedPunch);
-            mapaMarcacoes.set(prevDateStr, prevPunches);
+            prevPunches = mapaMarcacoes.get(prevDateStr)!;
           } else {
-            mapaMarcacoes.set(prevDateStr, [orphanedPunch]);
+            // Tenta buscar do banco de dados para não sobrescrever o dia anterior (ex: último dia do mês passado)
+            try {
+              const existing = await db.select().from(timeEntries).where(and(eq(timeEntries.matricula, matricula), eq(timeEntries.date, prevDateStr))).limit(1);
+              if (existing.length > 0) {
+                const row = existing[0] as any;
+                const cols = ['entry_1', 'exit_1', 'entry_2', 'exit_2', 'entry_3', 'exit_3', 'entry_4', 'exit_4', 'entry_5', 'exit_5'];
+                for (const col of cols) {
+                  if (row[col]) prevPunches.push(row[col] as string);
+                }
+              }
+            } catch (e) {
+              console.error("Erro ao buscar dia anterior do DB:", e);
+            }
           }
           
+          prevPunches.push(orphanedPunch);
+          prevPunches.sort(); // Garante que fica na ordem certa
+          mapaMarcacoes.set(prevDateStr, prevPunches);
           mapaMarcacoes.set(currentDate, currentPunches);
         }
       }
