@@ -68,6 +68,7 @@ export default function App() {
   const [isEditing, setIsEditing] = useState(false);
   const [activeTab, setActiveTab] = useState<'history' | 'calendar' | 'stats'>('history');
   const [previousBalance, setPreviousBalance] = useState(0);
+  const [dailyWorkHours, setDailyWorkHours] = useState(440); // 7:20 in minutes
   const [loading, setLoading] = useState(true);
   const [isSyncingCompany, setIsSyncingCompany] = useState(false);
   const [theme, setTheme] = useState<'dark' | 'light'>('dark');
@@ -134,6 +135,7 @@ export default function App() {
       setEntries(Array.isArray(entriesData.entries) ? entriesData.entries : []);
       setHolidays(Array.isArray(entriesData.holidays) ? entriesData.holidays : []);
       setPreviousBalance(parseInt(settingsData.previous_balance || '0'));
+      setDailyWorkHours(parseInt(settingsData.daily_work_hours || '440'));
     } catch (err) {
       console.error('Erro ao buscar dados:', err);
     } finally {
@@ -147,7 +149,10 @@ export default function App() {
       const response = await fetch('/api/settings', {
         method: 'POST',
         headers: getHeaders(),
-        body: JSON.stringify({ previous_balance: previousBalance }),
+        body: JSON.stringify({ 
+          previous_balance: previousBalance,
+          daily_work_hours: dailyWorkHours
+        }),
       });
       if (!response.ok) {
         const errorData = await response.json();
@@ -303,7 +308,7 @@ export default function App() {
       const { isWeekend, holiday } = getDayStatus(entry.date);
       const entriesArr = [entry.entry_1, entry.entry_2, entry.entry_3, entry.entry_4, entry.entry_5];
       const exitsArr = [entry.exit_1, entry.exit_2, entry.exit_3, entry.exit_4, entry.exit_5];
-      const result = calculateDay(entriesArr, exitsArr, isWeekend || !!holiday);
+      const result = calculateDay(entriesArr, exitsArr, isWeekend || !!holiday, dailyWorkHours);
       totalBalance += result.balance;
       totalNight += result.nightMinutesFicta;
       if (entry.date === todayStr) {
@@ -534,7 +539,7 @@ export default function App() {
                       const { isWeekend, holiday } = getDayStatus(entry.date);
                       const entriesArr = [entry.entry_1, entry.entry_2, entry.entry_3, entry.entry_4, entry.entry_5];
                       const exitsArr = [entry.exit_1, entry.exit_2, entry.exit_3, entry.exit_4, entry.exit_5];
-                      const result = calculateDay(entriesArr, exitsArr, isWeekend || !!holiday);
+                      const result = calculateDay(entriesArr, exitsArr, isWeekend || !!holiday, dailyWorkHours);
                       
                       return (
                         <tr 
@@ -639,7 +644,7 @@ export default function App() {
                   if (entry) {
                     const entriesArr = [entry.entry_1, entry.entry_2, entry.entry_3, entry.entry_4, entry.entry_5];
                     const exitsArr = [entry.exit_1, entry.exit_2, entry.exit_3, entry.exit_4, entry.exit_5];
-                    const result = calculateDay(entriesArr, exitsArr, isWeekend || !!holiday);
+                    const result = calculateDay(entriesArr, exitsArr, isWeekend || !!holiday, dailyWorkHours);
                     balance = result.balance;
                   }
 
@@ -699,13 +704,13 @@ export default function App() {
                           const { isWeekend, holiday } = getDayStatus(entry.date);
                           const entriesArr = [entry.entry_1, entry.entry_2, entry.entry_3, entry.entry_4, entry.entry_5];
                           const exitsArr = [entry.exit_1, entry.exit_2, entry.exit_3, entry.exit_4, entry.exit_5];
-                          return calculateDay(entriesArr, exitsArr, isWeekend || !!holiday).balance;
+                          return calculateDay(entriesArr, exitsArr, isWeekend || !!holiday, dailyWorkHours).balance;
                         }} name="Saldo (min)">
                           {(entries || []).slice().reverse().map((entry, index) => {
                             const { isWeekend, holiday } = getDayStatus(entry.date);
                             const entriesArr = [entry.entry_1, entry.entry_2, entry.entry_3, entry.entry_4, entry.entry_5];
                             const exitsArr = [entry.exit_1, entry.exit_2, entry.exit_3, entry.exit_4, entry.exit_5];
-                            const balance = calculateDay(entriesArr, exitsArr, isWeekend || !!holiday).balance;
+                            const balance = calculateDay(entriesArr, exitsArr, isWeekend || !!holiday, dailyWorkHours).balance;
                             return <Cell key={`cell-${index}`} fill={balance >= 0 ? '#10b98180' : '#f43f5e80'} />;
                           })}
                         </Bar>
@@ -886,6 +891,28 @@ export default function App() {
                   </div>
                   <p className="text-[10px] text-zinc-500 dark:text-zinc-500">
                     Insira o saldo positivo ou negativo em minutos. Esse valor será somado ao total acumulado.
+                  </p>
+                </div>
+
+                <div className="space-y-2">
+                  <label className="text-xs font-bold text-zinc-500 dark:text-zinc-500 uppercase tracking-widest flex items-center gap-2">
+                    <Clock className="w-4 h-4" />
+                    Jornada de Trabalho Diária (Minutos)
+                  </label>
+                  <div className="flex gap-4 items-center">
+                    <input 
+                      type="number" 
+                      value={dailyWorkHours}
+                      onChange={e => setDailyWorkHours(parseInt(e.target.value || '0'))}
+                      className="flex-1 bg-black/5 dark:bg-white/5 border border-black/10 dark:border-white/10 rounded-2xl px-4 py-3 focus:outline-none focus:border-emerald-500/50 transition-colors text-black dark:text-white font-mono"
+                      placeholder="Ex: 440 para 7:20h ou 480 para 8:00h"
+                    />
+                    <div className="text-sm font-mono text-zinc-600 dark:text-zinc-400 bg-black/5 dark:bg-white/5 px-4 py-3 rounded-2xl border border-black/10 dark:border-white/10 min-w-[100px] text-center">
+                      {minutesToTime(dailyWorkHours)}h
+                    </div>
+                  </div>
+                  <p className="text-[10px] text-zinc-500 dark:text-zinc-500">
+                    Insira a sua jornada de trabalho diária em minutos. Ex: 7:20h = 440 minutos, 8:00h = 480 minutos.
                   </p>
                 </div>
 
