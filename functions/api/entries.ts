@@ -84,15 +84,6 @@ export async function onRequestPost(context: any) {
       cleanedData[field] = (data[field] === '' || data[field] === undefined) ? null : data[field];
     });
 
-    // Use raw SQL for upsert to handle composite primary key correctly
-    const entriesArr = [
-      cleanedData.entry_1, cleanedData.exit_1,
-      cleanedData.entry_2, cleanedData.exit_2,
-      cleanedData.entry_3, cleanedData.exit_3,
-      cleanedData.entry_4, cleanedData.exit_4,
-      cleanedData.entry_5, cleanedData.exit_5
-    ];
-    
     const isExtra = data.is_extra === true;
 
     await db.execute(sql`
@@ -101,7 +92,7 @@ export async function onRequestPost(context: any) {
         entry_1, exit_1, entry_2, exit_2, entry_3, exit_3, entry_4, exit_4, entry_5, exit_5, is_manual, is_extra
       ) VALUES (
         ${matricula}, ${cleanedData.date},
-        ${entriesArr[0]}, ${entriesArr[1]}, ${entriesArr[2]}, ${entriesArr[3]}, ${entriesArr[4]}, ${entriesArr[5]}, ${entriesArr[6]}, ${entriesArr[7]}, ${entriesArr[8]}, ${entriesArr[9]}, TRUE, ${isExtra}
+        ${cleanedData.entry_1}, ${cleanedData.exit_1}, ${cleanedData.entry_2}, ${cleanedData.exit_2}, ${cleanedData.entry_3}, ${cleanedData.exit_3}, ${cleanedData.entry_4}, ${cleanedData.exit_4}, ${cleanedData.entry_5}, ${cleanedData.exit_5}, TRUE, ${isExtra}
       )
       ON CONFLICT (matricula, date) DO UPDATE SET
         entry_1 = EXCLUDED.entry_1, exit_1 = EXCLUDED.exit_1,

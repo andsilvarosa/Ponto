@@ -287,21 +287,13 @@ export async function onRequestPost(context: any) {
       };
 
       try {
-        const entriesArr = [
-          marcacao.entry_1, marcacao.exit_1,
-          marcacao.entry_2, marcacao.exit_2,
-          marcacao.entry_3, marcacao.exit_3,
-          marcacao.entry_4, marcacao.exit_4,
-          marcacao.entry_5, marcacao.exit_5
-        ];
-        
         await db.execute(sql`
           INSERT INTO time_entries (
             matricula, date, 
             entry_1, exit_1, entry_2, exit_2, entry_3, exit_3, entry_4, exit_4, entry_5, exit_5
           ) VALUES (
             ${matricula}, ${marcacao.date},
-            ${entriesArr[0]}, ${entriesArr[1]}, ${entriesArr[2]}, ${entriesArr[3]}, ${entriesArr[4]}, ${entriesArr[5]}, ${entriesArr[6]}, ${entriesArr[7]}, ${entriesArr[8]}, ${entriesArr[9]}
+            ${marcacao.entry_1}, ${marcacao.exit_1}, ${marcacao.entry_2}, ${marcacao.exit_2}, ${marcacao.entry_3}, ${marcacao.exit_3}, ${marcacao.entry_4}, ${marcacao.exit_4}, ${marcacao.entry_5}, ${marcacao.exit_5}
           )
           ON CONFLICT (matricula, date) DO UPDATE SET
             entry_1 = EXCLUDED.entry_1, exit_1 = EXCLUDED.exit_1,
