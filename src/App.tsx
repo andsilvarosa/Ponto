@@ -58,6 +58,8 @@ interface Holiday {
 }
 
 export default function App() {
+  const [matricula, setMatricula] = useState<string>(() => localStorage.getItem('matricula') || '');
+  const [isLoggedIn, setIsLoggedIn] = useState<boolean>(() => !!localStorage.getItem('matricula'));
   const [entries, setEntries] = useState<TimeEntry[]>([]);
   const [holidays, setHolidays] = useState<Holiday[]>([]);
   const [currentTime, setCurrentTime] = useState(new Date());
@@ -95,15 +97,27 @@ export default function App() {
 
   useEffect(() => {
     const timer = setInterval(() => setCurrentTime(new Date()), 1000);
-    fetchData();
     return () => clearInterval(timer);
   }, []);
 
+  useEffect(() => {
+    if (isLoggedIn) {
+      fetchData();
+    }
+  }, [isLoggedIn]);
+
+  const getHeaders = () => ({
+    'Content-Type': 'application/json',
+    'x-matricula': matricula
+  });
+
   const fetchData = async () => {
+    if (!matricula) return;
+    setLoading(true);
     try {
       const [entriesRes, settingsRes] = await Promise.all([
-        fetch('/api/entries'),
-        fetch('/api/settings')
+        fetch('/api/entries', { headers: { 'x-matricula': matricula } }),
+        fetch('/api/settings', { headers: { 'x-matricula': matricula } })
       ]);
       
       if (!entriesRes.ok || !settingsRes.ok) {
@@ -132,7 +146,7 @@ export default function App() {
     try {
       const response = await fetch('/api/settings', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: getHeaders(),
         body: JSON.stringify({ previous_balance: previousBalance }),
       });
       if (!response.ok) {
@@ -152,7 +166,7 @@ export default function App() {
     try {
       const response = await fetch('/api/entries', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: getHeaders(),
         body: JSON.stringify(formData),
       });
       
@@ -185,7 +199,10 @@ export default function App() {
   const handleDelete = async (date: string) => {
     if (!window.confirm('Tem certeza que deseja excluir esta marcação?')) return;
     try {
-      await fetch(`/api/entries/${date}`, { method: 'DELETE' });
+      await fetch(`/api/entries/${date}`, { 
+        method: 'DELETE',
+        headers: { 'x-matricula': matricula }
+      });
       fetchData();
     } catch (err) {
       console.error('Erro ao deletar:', err);
@@ -218,7 +235,7 @@ export default function App() {
 
   const syncHolidays = async () => {
     try {
-      await fetch('/api/sync-feriados');
+      await fetch('/api/sync-feriados', { headers: { 'x-matricula': matricula } });
       fetchData();
     } catch (err) {
       console.error('Erro ao sincronizar feriados:', err);
@@ -228,7 +245,10 @@ export default function App() {
   const syncCompanyPonto = async () => {
     setIsSyncingCompany(true);
     try {
-      const response = await fetch('/api/sync-ponto-empresa', { method: 'POST' });
+      const response = await fetch('/api/sync-ponto-empresa', { 
+        method: 'POST',
+        headers: { 'x-matricula': matricula }
+      });
       
       if (!response.ok) {
         let errorMsg = `Erro ao sincronizar: Status ${response.status}`;
@@ -296,6 +316,54 @@ export default function App() {
 
   const stats = calculateStats();
 
+  const handleLogin = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (matricula.trim().length > 0) {
+      localStorage.setItem('matricula', matricula.trim());
+      setIsLoggedIn(true);
+    }
+  };
+
+  if (!isLoggedIn) {
+    return (
+      <div className="min-h-screen bg-zinc-50 dark:bg-[#0a0a0a] flex items-center justify-center p-4">
+        <motion.div 
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="bg-white dark:bg-[#121214] border border-black/10 dark:border-white/10 p-8 rounded-3xl shadow-2xl w-full max-w-md"
+        >
+          <div className="flex flex-col items-center mb-8">
+            <div className="w-16 h-16 bg-emerald-500 rounded-2xl flex items-center justify-center shadow-lg shadow-emerald-500/20 mb-4">
+              <Clock className="text-black w-8 h-8" />
+            </div>
+            <h1 className="text-2xl font-bold text-zinc-900 dark:text-zinc-100">Ponto CLT</h1>
+            <p className="text-zinc-500 dark:text-zinc-400 text-sm mt-2">Digite sua matrícula para acessar</p>
+          </div>
+
+          <form onSubmit={handleLogin} className="space-y-6">
+            <div className="space-y-2">
+              <label className="text-xs font-bold text-zinc-500 dark:text-zinc-500 uppercase tracking-widest">Matrícula</label>
+              <input 
+                type="text" 
+                required
+                value={matricula}
+                onChange={e => setMatricula(e.target.value)}
+                placeholder="Ex: 121212"
+                className="w-full bg-black/5 dark:bg-white/5 border border-black/10 dark:border-white/10 rounded-2xl px-4 py-3 focus:outline-none focus:border-emerald-500/50 transition-colors text-black dark:text-white"
+              />
+            </div>
+            <button 
+              type="submit"
+              className="w-full bg-emerald-500 hover:bg-emerald-400 text-black px-6 py-4 rounded-2xl font-bold transition-all shadow-lg shadow-emerald-500/20"
+            >
+              Acessar
+            </button>
+          </form>
+        </motion.div>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-zinc-50 dark:bg-[#0a0a0a] text-zinc-900 dark:text-zinc-100 font-sans selection:bg-emerald-500/30">
       {/* Sidebar / Navigation */}
@@ -333,6 +401,18 @@ export default function App() {
             onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
           >
             {theme === 'dark' ? <Sun className="w-6 h-6" /> : <Moon className="w-6 h-6" />}
+          </button>
+          <button 
+            className="p-3 text-zinc-500 dark:text-zinc-500 hover:text-rose-500 dark:hover:text-rose-400 transition-all mt-auto" 
+            onClick={() => {
+              localStorage.removeItem('matricula');
+              setIsLoggedIn(false);
+              setMatricula('');
+              setEntries([]);
+            }}
+            title="Sair"
+          >
+            <X className="w-6 h-6" />
           </button>
         </div>
       </nav>

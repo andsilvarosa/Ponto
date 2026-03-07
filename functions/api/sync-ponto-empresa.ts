@@ -5,11 +5,13 @@ import { drizzle } from 'drizzle-orm/neon-http';
 import * as cheerio from 'cheerio';
 
 export async function onRequestPost(context: any) {
+  const matricula = context.request.headers.get('x-matricula');
+  if (!matricula) return Response.json({ error: "Matrícula não informada" }, { status: 400 });
+
   const sqlClient = neon(context.env.DATABASE_URL);
   const db = drizzle(sqlClient);
 
   try {
-    const matricula = '109194'; 
     const url = 'https://webapp.confianca.com.br/consultaponto/ponto.aspx';
 
     // 1. GET Inicial e Captura de Cookies da Sessão
@@ -92,48 +94,29 @@ export async function onRequestPost(context: any) {
     try {
       await db.execute(sql`
         CREATE TABLE IF NOT EXISTS time_entries (
-          date TEXT PRIMARY KEY,
+          matricula TEXT NOT NULL DEFAULT '000000',
+          date TEXT NOT NULL,
           entry_1 TEXT, exit_1 TEXT,
           entry_2 TEXT, exit_2 TEXT,
           entry_3 TEXT, exit_3 TEXT,
           entry_4 TEXT, exit_4 TEXT,
           entry_5 TEXT, exit_5 TEXT,
-          created_at TIMESTAMP DEFAULT NOW()
+          created_at TIMESTAMP DEFAULT NOW(),
+          PRIMARY KEY (matricula, date)
         )
       `);
       
-      // Limpar duplicatas e nulos para permitir a criação da constraint
-      await db.execute(sql`DELETE FROM time_entries WHERE date IS NULL`);
-      await db.execute(sql`
-        DELETE FROM time_entries a USING time_entries b
-        WHERE a.date = b.date AND a.ctid > b.ctid
-      `);
-
-      await db.execute(sql`ALTER TABLE time_entries ADD PRIMARY KEY (date)`);
-    } catch (e: any) {
-      // Se falhar (ex: já existe uma PK noutra coluna), tentamos adicionar UNIQUE
+      // Add matricula column if it doesn't exist
+      await db.execute(sql`ALTER TABLE time_entries ADD COLUMN IF NOT EXISTS matricula TEXT NOT NULL DEFAULT '000000'`);
+      
+      // Drop old primary key and add new composite primary key
       try {
-        await db.execute(sql`ALTER TABLE time_entries ADD CONSTRAINT time_entries_date_unique UNIQUE (date)`);
-      } catch (e2) {
-        // Se tudo falhar, e a tabela estiver vazia, recriamos do zero
-        try {
-          const result = await db.execute(sql`SELECT count(*) as total FROM time_entries`);
-          if (Number(result.rows[0].total) === 0) {
-            await db.execute(sql`DROP TABLE IF EXISTS time_entries`);
-            await db.execute(sql`
-              CREATE TABLE time_entries (
-                date TEXT PRIMARY KEY,
-                entry_1 TEXT, exit_1 TEXT,
-                entry_2 TEXT, exit_2 TEXT,
-                entry_3 TEXT, exit_3 TEXT,
-                entry_4 TEXT, exit_4 TEXT,
-                entry_5 TEXT, exit_5 TEXT,
-                created_at TIMESTAMP DEFAULT NOW()
-              )
-            `);
-          }
-        } catch (e3) {}
-      }
+        await db.execute(sql`ALTER TABLE time_entries DROP CONSTRAINT IF EXISTS time_entries_pkey`);
+        await db.execute(sql`ALTER TABLE time_entries DROP CONSTRAINT IF EXISTS time_entries_date_unique`);
+        await db.execute(sql`ALTER TABLE time_entries ADD PRIMARY KEY (matricula, date)`);
+      } catch (e) {}
+    } catch (e: any) {
+      console.error("Erro ao configurar tabela:", e);
     }
 
     // Garantir que as colunas são do tipo TEXT
@@ -150,6 +133,7 @@ export async function onRequestPost(context: any) {
     for (const [date, punches] of Array.from(mapaMarcacoes.entries())) {
       punches.sort();
       const marcacao: any = {
+        matricula: matricula,
         date: date,
         entry_1: punches[0] || null, exit_1: punches[1] || null,
         entry_2: punches[2] || null, exit_2: punches[3] || null,
@@ -159,8 +143,29 @@ export async function onRequestPost(context: any) {
       };
 
       try {
-        const { date: d, ...updateData } = marcacao;
-        await db.insert(timeEntries).values(marcacao).onConflictDoUpdate({ target: timeEntries.date, set: updateData });
+        const entriesArr = [
+          marcacao.entry_1, marcacao.exit_1,
+          marcacao.entry_2, marcacao.exit_2,
+          marcacao.entry_3, marcacao.exit_3,
+          marcacao.entry_4, marcacao.exit_4,
+          marcacao.entry_5, marcacao.exit_5
+        ];
+        
+        await db.execute(sql`
+          INSERT INTO time_entries (
+            matricula, date, 
+            entry_1, exit_1, entry_2, exit_2, entry_3, exit_3, entry_4, exit_4, entry_5, exit_5
+          ) VALUES (
+            ${matricula}, ${marcacao.date},
+            ${entriesArr[0]}, ${entriesArr[1]}, ${entriesArr[2]}, ${entriesArr[3]}, ${entriesArr[4]}, ${entriesArr[5]}, ${entriesArr[6]}, ${entriesArr[7]}, ${entriesArr[8]}, ${entriesArr[9]}
+          )
+          ON CONFLICT (matricula, date) DO UPDATE SET
+            entry_1 = EXCLUDED.entry_1, exit_1 = EXCLUDED.exit_1,
+            entry_2 = EXCLUDED.entry_2, exit_2 = EXCLUDED.exit_2,
+            entry_3 = EXCLUDED.entry_3, exit_3 = EXCLUDED.exit_3,
+            entry_4 = EXCLUDED.entry_4, exit_4 = EXCLUDED.exit_4,
+            entry_5 = EXCLUDED.entry_5, exit_5 = EXCLUDED.exit_5
+        `);
         savedCount++;
       } catch (e: any) {
         console.error("Erro ao guardar no DB:", e);

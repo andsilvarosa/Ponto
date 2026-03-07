@@ -1,4 +1,4 @@
-import { pgTable, text, integer, timestamp } from "drizzle-orm/pg-core";
+import { pgTable, text, integer, timestamp, primaryKey } from "drizzle-orm/pg-core";
 
 export const holidays = pgTable("holidays", {
   date: text("date").primaryKey(),
@@ -7,7 +7,8 @@ export const holidays = pgTable("holidays", {
 });
 
 export const timeEntries = pgTable("time_entries", {
-  date: text("date").primaryKey(),
+  matricula: text("matricula").notNull(),
+  date: text("date").notNull(),
   entry_1: text("entry_1"),
   exit_1: text("exit_1"),
   entry_2: text("entry_2"),
@@ -19,6 +20,10 @@ export const timeEntries = pgTable("time_entries", {
   entry_5: text("entry_5"),
   exit_5: text("exit_5"),
   createdAt: timestamp("created_at").defaultNow(),
+}, (table) => {
+  return {
+    pk: primaryKey({ columns: [table.matricula, table.date] }),
+  };
 });
 
 export const settings = pgTable("settings", {

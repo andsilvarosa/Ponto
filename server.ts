@@ -22,6 +22,9 @@ async function startServer() {
     request: {
       json: async () => req.body,
       text: async () => JSON.stringify(req.body),
+      headers: {
+        get: (name: string) => req.header(name)
+      }
     },
     env: {
       DATABASE_URL: process.env.DATABASE_URL,

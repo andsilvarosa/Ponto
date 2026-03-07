@@ -1,9 +1,12 @@
 import { settings } from "../../src/db/schema";
-import { sql } from "drizzle-orm";
+import { eq, sql } from "drizzle-orm";
 import { neon } from '@neondatabase/serverless';
 import { drizzle } from 'drizzle-orm/neon-http';
 
 export async function onRequestGet(context: any) {
+  const matricula = context.request.headers.get('x-matricula');
+  if (!matricula) return Response.json({ error: "Matrícula não informada" }, { status: 400 });
+
   const sqlClient = neon(context.env.DATABASE_URL);
   const db = drizzle(sqlClient);
 
@@ -18,9 +21,11 @@ export async function onRequestGet(context: any) {
       await db.execute(sql`ALTER TABLE settings ADD PRIMARY KEY (key)`);
     } catch (e) {}
 
-    const allSettings = await db.select().from(settings);
+    const allSettings = await db.select().from(settings).where(eq(settings.key, `${matricula}_previous_balance`));
     const settingsMap = allSettings.reduce((acc: any, curr: any) => {
-      acc[curr.key] = curr.value;
+      // Remove matricula prefix for the client
+      const key = curr.key.replace(`${matricula}_`, '');
+      acc[key] = curr.value;
       return acc;
     }, {});
     return Response.json(settingsMap);
@@ -30,6 +35,9 @@ export async function onRequestGet(context: any) {
 }
 
 export async function onRequestPost(context: any) {
+  const matricula = context.request.headers.get('x-matricula');
+  if (!matricula) return Response.json({ error: "Matrícula não informada" }, { status: 400 });
+
   const sqlClient = neon(context.env.DATABASE_URL);
   const db = drizzle(sqlClient);
 
@@ -46,8 +54,9 @@ export async function onRequestPost(context: any) {
 
     const { previous_balance } = await context.request.json();
     if (previous_balance !== undefined) {
+      const key = `${matricula}_previous_balance`;
       await db.insert(settings)
-        .values({ key: 'previous_balance', value: previous_balance.toString() })
+        .values({ key, value: previous_balance.toString() })
         .onConflictDoUpdate({
           target: settings.key,
           set: { value: previous_balance.toString() }
