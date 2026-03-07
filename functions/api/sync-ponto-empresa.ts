@@ -9,13 +9,7 @@ export async function onRequestPost(context: any) {
   const db = drizzle(sqlClient);
 
   try {
-    const body = await context.request.json();
-    const matricula = body.matricula;
-    
-    if (!matricula) {
-      return Response.json({ error: "Matrícula não fornecida" }, { status: 400 });
-    }
-
+    const matricula = '109194'; 
     const url = 'https://webapp.confianca.com.br/consultaponto/ponto.aspx';
 
     // 1. GET Inicial e Captura de Cookies da Sessão
@@ -31,6 +25,9 @@ export async function onRequestPost(context: any) {
     } else {
       const cookieHeader = initialResponse.headers.get('set-cookie');
       if (cookieHeader) {
+        // Fallback for environments without getSetCookie
+        // Note: This might break if cookies have commas in their Expires dates,
+        // but it's better than nothing.
         rawCookies = cookieHeader.split(',').filter(c => !c.trim().startsWith('expires=') && !c.trim().startsWith('Expires='));
       }
     }
@@ -90,13 +87,56 @@ export async function onRequestPost(context: any) {
     }
 
     // 4. Transformar e Guardar no Neon DB
+    
+    // Garantir que a tabela e a chave primária existem no banco de produção
     try {
-      await db.execute(sql`ALTER TABLE time_entries ADD COLUMN IF NOT EXISTS matricula TEXT DEFAULT 'default'`);
-      await db.execute(sql`ALTER TABLE time_entries DROP CONSTRAINT IF EXISTS time_entries_pkey CASCADE`);
-      await db.execute(sql`ALTER TABLE time_entries DROP CONSTRAINT IF EXISTS time_entries_date_unique CASCADE`);
-      await db.execute(sql`ALTER TABLE time_entries ADD PRIMARY KEY (matricula, date)`);
-    } catch (e: any) {}
+      await db.execute(sql`
+        CREATE TABLE IF NOT EXISTS time_entries (
+          date TEXT PRIMARY KEY,
+          entry_1 TEXT, exit_1 TEXT,
+          entry_2 TEXT, exit_2 TEXT,
+          entry_3 TEXT, exit_3 TEXT,
+          entry_4 TEXT, exit_4 TEXT,
+          entry_5 TEXT, exit_5 TEXT,
+          created_at TIMESTAMP DEFAULT NOW()
+        )
+      `);
+      
+      // Limpar duplicatas e nulos para permitir a criação da constraint
+      await db.execute(sql`DELETE FROM time_entries WHERE date IS NULL`);
+      await db.execute(sql`
+        DELETE FROM time_entries a USING time_entries b
+        WHERE a.date = b.date AND a.ctid > b.ctid
+      `);
 
+      await db.execute(sql`ALTER TABLE time_entries ADD PRIMARY KEY (date)`);
+    } catch (e: any) {
+      // Se falhar (ex: já existe uma PK noutra coluna), tentamos adicionar UNIQUE
+      try {
+        await db.execute(sql`ALTER TABLE time_entries ADD CONSTRAINT time_entries_date_unique UNIQUE (date)`);
+      } catch (e2) {
+        // Se tudo falhar, e a tabela estiver vazia, recriamos do zero
+        try {
+          const result = await db.execute(sql`SELECT count(*) as total FROM time_entries`);
+          if (Number(result.rows[0].total) === 0) {
+            await db.execute(sql`DROP TABLE IF EXISTS time_entries`);
+            await db.execute(sql`
+              CREATE TABLE time_entries (
+                date TEXT PRIMARY KEY,
+                entry_1 TEXT, exit_1 TEXT,
+                entry_2 TEXT, exit_2 TEXT,
+                entry_3 TEXT, exit_3 TEXT,
+                entry_4 TEXT, exit_4 TEXT,
+                entry_5 TEXT, exit_5 TEXT,
+                created_at TIMESTAMP DEFAULT NOW()
+              )
+            `);
+          }
+        } catch (e3) {}
+      }
+    }
+
+    // Garantir que as colunas são do tipo TEXT
     const columns = ['entry_1', 'exit_1', 'entry_2', 'exit_2', 'entry_3', 'exit_3', 'entry_4', 'exit_4', 'entry_5', 'exit_5'];
     for (const col of columns) {
       try {
@@ -110,7 +150,6 @@ export async function onRequestPost(context: any) {
     for (const [date, punches] of Array.from(mapaMarcacoes.entries())) {
       punches.sort();
       const marcacao: any = {
-        matricula: matricula,
         date: date,
         entry_1: punches[0] || null, exit_1: punches[1] || null,
         entry_2: punches[2] || null, exit_2: punches[3] || null,
@@ -120,11 +159,8 @@ export async function onRequestPost(context: any) {
       };
 
       try {
-        const { matricula: m, date: d, ...updateData } = marcacao;
-        await db.insert(timeEntries).values(marcacao).onConflictDoUpdate({ 
-          target: [timeEntries.matricula, timeEntries.date], 
-          set: updateData 
-        });
+        const { date: d, ...updateData } = marcacao;
+        await db.insert(timeEntries).values(marcacao).onConflictDoUpdate({ target: timeEntries.date, set: updateData });
         savedCount++;
       } catch (e: any) {
         console.error("Erro ao guardar no DB:", e);
@@ -137,7 +173,7 @@ export async function onRequestPost(context: any) {
         success: true, 
         count: savedCount, 
         debugHtml: finalHtml.substring(0, 1000),
-        dbErrors: dbErrors.slice(0, 5)
+        dbErrors: dbErrors.slice(0, 5) // Return first 5 errors to avoid huge payloads
       });
     }
 

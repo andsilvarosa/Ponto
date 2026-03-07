@@ -78,8 +78,7 @@ export interface PontoResult {
 export function calculateDay(
   entries: (string | null)[],
   exits: (string | null)[],
-  isHolidayOrSunday: boolean = false,
-  workdayMinutes: number = 440
+  isHolidayOrSunday: boolean = false
 ): PontoResult {
   let totalMinutes = 0;
   let nightMinutesRaw = 0;
@@ -100,7 +99,7 @@ export function calculateDay(
   const nightMinutesFicta = Math.round(nightMinutesRaw * (FATOR_NOTURNO - 1));
   const totalWithFicta = totalMinutes + nightMinutesFicta;
 
-  const balance = totalWithFicta - workdayMinutes;
+  const balance = totalWithFicta - JORNADA_PADRAO_MINUTOS;
   
   let overtimeNormal = 0;
   let overtime100 = 0;

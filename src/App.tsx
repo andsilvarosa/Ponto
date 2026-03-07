@@ -58,8 +58,6 @@ interface Holiday {
 }
 
 export default function App() {
-  const [matricula, setMatricula] = useState<string | null>(() => localStorage.getItem('matricula'));
-  const [workdayHours, setWorkdayHours] = useState<string>('07:20');
   const [entries, setEntries] = useState<TimeEntry[]>([]);
   const [holidays, setHolidays] = useState<Holiday[]>([]);
   const [currentTime, setCurrentTime] = useState(new Date());
@@ -97,30 +95,15 @@ export default function App() {
 
   useEffect(() => {
     const timer = setInterval(() => setCurrentTime(new Date()), 1000);
+    fetchData();
     return () => clearInterval(timer);
   }, []);
 
-  useEffect(() => {
-    if (matricula) {
-      localStorage.setItem('matricula', matricula);
-      fetchData();
-    } else {
-      localStorage.removeItem('matricula');
-      setEntries([]);
-      setHolidays([]);
-      setPreviousBalance(0);
-      setWorkdayHours('07:20');
-      setLoading(false);
-    }
-  }, [matricula]);
-
   const fetchData = async () => {
-    if (!matricula) return;
-    setLoading(true);
     try {
       const [entriesRes, settingsRes] = await Promise.all([
-        fetch(`/api/entries?matricula=${matricula}`),
-        fetch(`/api/settings?matricula=${matricula}`)
+        fetch('/api/entries'),
+        fetch('/api/settings')
       ]);
       
       if (!entriesRes.ok || !settingsRes.ok) {
@@ -137,7 +120,6 @@ export default function App() {
       setEntries(Array.isArray(entriesData.entries) ? entriesData.entries : []);
       setHolidays(Array.isArray(entriesData.holidays) ? entriesData.holidays : []);
       setPreviousBalance(parseInt(settingsData.previous_balance || '0'));
-      setWorkdayHours(settingsData.workday_hours || '07:20');
     } catch (err) {
       console.error('Erro ao buscar dados:', err);
     } finally {
@@ -147,12 +129,11 @@ export default function App() {
 
   const handleSaveSettings = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!matricula) return;
     try {
       const response = await fetch('/api/settings', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ matricula, previous_balance: previousBalance, workday_hours: workdayHours }),
+        body: JSON.stringify({ previous_balance: previousBalance }),
       });
       if (!response.ok) {
         const errorData = await response.json();
@@ -168,12 +149,11 @@ export default function App() {
 
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!matricula) return;
     try {
       const response = await fetch('/api/entries', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ ...formData, matricula }),
+        body: JSON.stringify(formData),
       });
       
       if (!response.ok) {
