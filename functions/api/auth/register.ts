@@ -51,18 +51,27 @@ export async function onRequestPost(context: any) {
     const hashedPassword = await bcrypt.hash(password, 4);
 
     step = "insert_user";
-    await db.execute(sql`
-      INSERT INTO users (matricula, password, name, created_at)
-      VALUES (${matricula}, ${hashedPassword}, ${name || null}, NOW())
-    `);
+    // Use Drizzle ORM for safer insertion
+    await db.insert(users).values({
+      matricula: matricula.toString().trim(),
+      password: hashedPassword,
+      name: name ? name.toString() : null,
+    });
 
     return Response.json({ success: true, message: "Usuário cadastrado com sucesso" });
   } catch (error: any) {
     console.error(`Erro no registro (step: ${step}):`, error);
+    
+    // Provide more context if it's a database error
+    let errorMessage = error.message;
+    if (errorMessage.includes("already exists")) {
+      return Response.json({ error: "Esta matrícula já está cadastrada" }, { status: 400 });
+    }
+
     return Response.json({ 
       error: "Erro ao cadastrar usuário", 
       step,
-      details: error.message,
+      details: errorMessage,
       stack: error.stack
     }, { status: 500 });
   }
