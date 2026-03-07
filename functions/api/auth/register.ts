@@ -51,12 +51,13 @@ export async function onRequestPost(context: any) {
     const hashedPassword = await bcrypt.hash(password, 4);
 
     step = "insert_user";
-    const m = String(matricula).trim();
-    const p = hashedPassword;
-    const n = name ? String(name) : null;
     
-    // Use raw SQL to avoid any ORM mapping issues and let DB handle defaults
-    await db.execute(sql`INSERT INTO users (matricula, password, name) VALUES (${m}, ${p}, ${n})`);
+    // Use Drizzle ORM for insertion to avoid parameter parsing issues with bcrypt hash
+    await db.insert(users).values({
+      matricula: String(matricula).trim(),
+      password: hashedPassword,
+      name: name ? String(name) : null,
+    });
 
     return Response.json({ success: true, message: "Usuário cadastrado com sucesso" });
   } catch (error: any) {
