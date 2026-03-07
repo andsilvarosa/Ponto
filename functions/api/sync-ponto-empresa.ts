@@ -171,8 +171,7 @@ export async function onRequestPost(context: any) {
           entry_5 TEXT, exit_5 TEXT,
           is_manual BOOLEAN DEFAULT FALSE,
           is_extra BOOLEAN DEFAULT FALSE,
-          created_at TIMESTAMP DEFAULT NOW(),
-          PRIMARY KEY (matricula, date)
+          created_at TIMESTAMP DEFAULT NOW()
         )
       `);
       
@@ -181,25 +180,24 @@ export async function onRequestPost(context: any) {
       await db.execute(sql`ALTER TABLE time_entries ADD COLUMN IF NOT EXISTS is_manual BOOLEAN DEFAULT FALSE`);
       await db.execute(sql`ALTER TABLE time_entries ADD COLUMN IF NOT EXISTS is_extra BOOLEAN DEFAULT FALSE`);
       
-      // Drop old primary key and add new composite primary key
+      // Fix NULLs and constraints
       try {
-        console.log("Tentando ajustar constraints da tabela time_entries...");
-        await db.execute(sql`ALTER TABLE time_entries DROP CONSTRAINT IF EXISTS time_entries_pkey`);
-        await db.execute(sql`ALTER TABLE time_entries DROP CONSTRAINT IF EXISTS time_entries_date_unique`);
-        await db.execute(sql`ALTER TABLE time_entries DROP CONSTRAINT IF EXISTS time_entries_matricula_date_pk`);
+        console.log("Limpando dados e ajustando índices...");
+        await db.execute(sql`UPDATE time_entries SET matricula = '000000' WHERE matricula IS NULL`);
+        await db.execute(sql`ALTER TABLE time_entries ALTER COLUMN matricula SET NOT NULL`);
+        await db.execute(sql`ALTER TABLE time_entries ALTER COLUMN date SET NOT NULL`);
         
-        // Remove duplicates before adding primary key
-        console.log("Removendo duplicatas...");
+        // Remove duplicates
         await db.execute(sql`
           DELETE FROM time_entries a USING time_entries b
           WHERE a.matricula = b.matricula AND a.date = b.date AND a.ctid > b.ctid
         `);
         
-        console.log("Adicionando nova PRIMARY KEY (matricula, date)...");
-        await db.execute(sql`ALTER TABLE time_entries ADD PRIMARY KEY (matricula, date)`);
-        console.log("PRIMARY KEY adicionada com sucesso.");
+        // Create unique index for ON CONFLICT
+        await db.execute(sql`CREATE UNIQUE INDEX IF NOT EXISTS time_entries_matricula_date_idx ON time_entries (matricula, date)`);
+        console.log("Índice único criado com sucesso.");
       } catch (e: any) {
-        console.error("Erro ao recriar primary key:", e.message);
+        console.error("Erro ao ajustar índices:", e.message);
       }
     } catch (e: any) {
       console.error("Erro ao configurar tabela:", e);

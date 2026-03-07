@@ -39,32 +39,27 @@ export async function onRequestGet(context: any) {
     }
 
     try {
-      logs.push("Limpando constraints antigas...");
-      await db.execute(sql`ALTER TABLE time_entries DROP CONSTRAINT IF EXISTS time_entries_pkey`);
-      await db.execute(sql`ALTER TABLE time_entries DROP CONSTRAINT IF EXISTS time_entries_date_unique`);
-      await db.execute(sql`ALTER TABLE time_entries DROP CONSTRAINT IF EXISTS time_entries_matricula_date_pk`);
-      logs.push("Constraints antigas removidas.");
-    } catch (e: any) {
-      logs.push("Aviso ao remover constraints: " + e.message);
-    }
-
-    try {
-      logs.push("Removendo duplicatas (matricula + date)...");
+      logs.push("Limpando dados e ajustando índices...");
+      await db.execute(sql`UPDATE time_entries SET matricula = '000000' WHERE matricula IS NULL`);
+      await db.execute(sql`ALTER TABLE time_entries ALTER COLUMN matricula SET NOT NULL`);
+      await db.execute(sql`ALTER TABLE time_entries ALTER COLUMN date SET NOT NULL`);
+      
+      // Remove duplicates
       await db.execute(sql`
         DELETE FROM time_entries a USING time_entries b
         WHERE a.matricula = b.matricula AND a.date = b.date AND a.ctid > b.ctid
       `);
-      logs.push("Duplicatas removidas.");
+      logs.push("Dados limpos e duplicatas removidas.");
     } catch (e: any) {
-      logs.push("Erro ao remover duplicatas: " + e.message);
+      logs.push("Erro ao limpar dados: " + e.message);
     }
 
     try {
-      logs.push("Adicionando PRIMARY KEY (matricula, date)...");
-      await db.execute(sql`ALTER TABLE time_entries ADD PRIMARY KEY (matricula, date)`);
-      logs.push("PRIMARY KEY adicionada com sucesso.");
+      logs.push("Criando índice único (matricula, date)...");
+      await db.execute(sql`CREATE UNIQUE INDEX IF NOT EXISTS time_entries_matricula_date_idx ON time_entries (matricula, date)`);
+      logs.push("Índice único criado com sucesso.");
     } catch (e: any) {
-      logs.push("Erro ao adicionar PRIMARY KEY: " + e.message);
+      logs.push("Erro ao criar índice único: " + e.message);
     }
 
     try {
