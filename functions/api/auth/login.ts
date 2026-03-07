@@ -10,21 +10,8 @@ export async function onRequestPost(context: any) {
   const db = drizzle(sqlClient);
 
   try {
-    // Ensure table exists and has correct columns
-    await db.execute(sql`
-      CREATE TABLE IF NOT EXISTS users (
-        matricula TEXT PRIMARY KEY,
-        password TEXT NOT NULL,
-        name TEXT,
-        created_at TIMESTAMP DEFAULT NOW()
-      )
-    `);
-    try {
-      await db.execute(sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS matricula TEXT`);
-      await db.execute(sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS password TEXT`);
-    } catch (e) {}
-
     const { matricula, password } = await context.request.json();
+    console.log("Tentativa de login para matricula:", matricula);
 
     if (!matricula || !password) {
       return Response.json({ error: "Matrícula e senha são obrigatórios" }, { status: 400 });
