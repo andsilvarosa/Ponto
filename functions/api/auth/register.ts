@@ -10,7 +10,7 @@ export async function onRequestPost(context: any) {
   const db = drizzle(sqlClient);
 
   try {
-    // Ensure table exists
+    // Ensure table exists and has correct columns
     await db.execute(sql`
       CREATE TABLE IF NOT EXISTS users (
         matricula TEXT PRIMARY KEY,
@@ -19,6 +19,10 @@ export async function onRequestPost(context: any) {
         created_at TIMESTAMP DEFAULT NOW()
       )
     `);
+    try {
+      await db.execute(sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS matricula TEXT`);
+      await db.execute(sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS password TEXT`);
+    } catch (e) {}
 
     const { matricula, password, name } = await context.request.json();
 

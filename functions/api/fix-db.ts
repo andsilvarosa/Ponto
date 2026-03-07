@@ -39,7 +39,7 @@ export async function onRequestGet(context: any) {
     }
 
     try {
-      logs.push("Criando tabela de usuários...");
+      logs.push("Ajustando tabela de usuários...");
       await db.execute(sql`
         CREATE TABLE IF NOT EXISTS users (
           matricula TEXT PRIMARY KEY,
@@ -48,9 +48,20 @@ export async function onRequestGet(context: any) {
           created_at TIMESTAMP DEFAULT NOW()
         )
       `);
-      logs.push("Tabela de usuários criada com sucesso.");
+      // Garantir que a coluna matricula existe (caso a tabela tenha sido criada incompleta)
+      await db.execute(sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS matricula TEXT`);
+      await db.execute(sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS password TEXT`);
+      await db.execute(sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS name TEXT`);
+      await db.execute(sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS created_at TIMESTAMP DEFAULT NOW()`);
+      
+      // Tentar definir como primary key se não for
+      try {
+        await db.execute(sql`ALTER TABLE users ADD PRIMARY KEY (matricula)`);
+      } catch (e) {}
+      
+      logs.push("Tabela de usuários ajustada com sucesso.");
     } catch (e: any) {
-      logs.push("Erro ao criar tabela de usuários: " + e.message);
+      logs.push("Erro ao ajustar tabela de usuários: " + e.message);
     }
 
     try {
