@@ -44,67 +44,117 @@ export async function onRequestPost(context: any) {
 
     if (!viewState) return Response.json({ error: "ViewState não encontrado." }, { status: 500 });
 
-    // 2. POST com Form Data simulado
-    const formData = new URLSearchParams();
-    formData.append('__EVENTTARGET', 'btnConsultar');
-    formData.append('__EVENTARGUMENT', '');
-    formData.append('__VIEWSTATE', viewState);
-    if (viewStateGenerator) formData.append('__VIEWSTATEGENERATOR', viewStateGenerator);
-    if (eventValidation) formData.append('__EVENTVALIDATION', eventValidation);
-    formData.append('txtMatricula', matricula);
+    // 2. Extrair dias do mês atual até hoje
+    const todayStr = new Date().toLocaleString('en-US', { timeZone: 'America/Sao_Paulo' });
+    const today = new Date(todayStr);
+    const currentDay = today.getDate();
+    const meses = ['janeiro', 'fevereiro', 'março', 'abril', 'maio', 'junho', 'julho', 'agosto', 'setembro', 'outubro', 'novembro', 'dezembro'];
+    const currentMonthName = meses[today.getMonth()];
 
-    // Tentar enviar o período do mês atual
-    const today = new Date();
-    const firstDay = new Date(today.getFullYear(), today.getMonth(), 1);
-    const formatDateBr = (d: Date) => `${String(d.getDate()).padStart(2, '0')}/${String(d.getMonth() + 1).padStart(2, '0')}/${d.getFullYear()}`;
-    
-    formData.append('txtDataInicial', formatDateBr(firstDay));
-    formData.append('txtDataFinal', formatDateBr(today));
-    formData.append('txtDataInicio', formatDateBr(firstDay)); // Tentativa com outro nome comum
-    formData.append('txtDataFim', formatDateBr(today));
-
-    const postResponse = await fetch(url, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/x-www-form-urlencoded',
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)',
-        'Cookie': sessionCookie
-      },
-      body: formData.toString()
-    });
-
-    const finalHtml = await postResponse.text();
-    const $ = cheerio.load(finalHtml);
-    const mapaMarcacoes: Map<string, any> = new Map();
-
-    // 3. Extração de dados da Tabela
-    const dataAtual = new Date().toLocaleDateString('en-CA', { timeZone: 'America/Sao_Paulo' });
-
-    $('#Grid tr, table tr').each((index, element) => {
-      const textoLinha = $(element).text().replace(/\s+/g, ' ').trim();
-      
-      // Procurar por uma data no formato DD/MM/YYYY
-      const matchData = textoLinha.match(/(\d{2})\/(\d{2})\/(\d{4})/);
-      let rowDate = dataAtual;
-      if (matchData) {
-        rowDate = `${matchData[3]}-${matchData[2]}-${matchData[1]}`; // YYYY-MM-DD
-      }
-
-      const matchesHorario = textoLinha.match(/([0-2]?\d:[0-5]\d)/g);
-      
-      if (matchesHorario) {
-        const punchesDoDia: string[] = [];
-        matchesHorario.forEach(h => {
-          let [hora, min] = h.split(':');
-          const hFormatada = `${hora.padStart(2, '0')}:${min}`;
-          if (!punchesDoDia.includes(hFormatada)) punchesDoDia.push(hFormatada);
-        });
-        
-        if (punchesDoDia.length > 0) {
-          mapaMarcacoes.set(rowDate, punchesDoDia);
+    const daysToFetch: { arg: string, day: number, monthName: string }[] = [];
+    $initial('#Calendar a').each((i, el) => {
+      const href = $initial(el).attr('href');
+      const title = $initial(el).attr('title');
+      if (href && href.includes("__doPostBack('Calendar'")) {
+        const match = href.match(/'Calendar','(\d+)'/);
+        if (match && title) {
+          const arg = match[1];
+          const parts = title.split(' de ');
+          if (parts.length >= 2) {
+            const day = parseInt(parts[0]);
+            const monthName = parts[1].toLowerCase();
+            if (monthName === currentMonthName && day <= currentDay) {
+              daysToFetch.push({ arg, day, monthName });
+            }
+          }
         }
       }
     });
+
+    const mapaMarcacoes: Map<string, any> = new Map();
+
+    // Função auxiliar para buscar um dia específico
+    const fetchDay = async (dayInfo: { arg: string, day: number, monthName: string }) => {
+      try {
+        // 2.1 Selecionar o dia
+        const formData1 = new URLSearchParams();
+        formData1.append('__EVENTTARGET', 'Calendar');
+        formData1.append('__EVENTARGUMENT', dayInfo.arg);
+        formData1.append('__VIEWSTATE', viewState);
+        if (viewStateGenerator) formData1.append('__VIEWSTATEGENERATOR', viewStateGenerator);
+        if (eventValidation) formData1.append('__EVENTVALIDATION', eventValidation);
+        formData1.append('txtMatricula', matricula);
+
+        const postResponse1 = await fetch(url, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/x-www-form-urlencoded',
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)',
+            'Cookie': sessionCookie
+          },
+          body: formData1.toString()
+        });
+
+        const html1 = await postResponse1.text();
+        const $1 = cheerio.load(html1);
+
+        const viewState1 = $1('input[name="__VIEWSTATE"]').val() as string;
+        const viewStateGenerator1 = $1('input[name="__VIEWSTATEGENERATOR"]').val() as string;
+        const eventValidation1 = $1('input[name="__EVENTVALIDATION"]').val() as string;
+
+        // 2.2 Clicar em Consultar
+        const formData2 = new URLSearchParams();
+        formData2.append('__EVENTTARGET', 'btnConsultar');
+        formData2.append('__EVENTARGUMENT', '');
+        formData2.append('__VIEWSTATE', viewState1);
+        if (viewStateGenerator1) formData2.append('__VIEWSTATEGENERATOR', viewStateGenerator1);
+        if (eventValidation1) formData2.append('__EVENTVALIDATION', eventValidation1);
+        formData2.append('txtMatricula', matricula);
+
+        const postResponse2 = await fetch(url, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/x-www-form-urlencoded',
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)',
+            'Cookie': sessionCookie
+          },
+          body: formData2.toString()
+        });
+
+        const finalHtml = await postResponse2.text();
+        const $2 = cheerio.load(finalHtml);
+
+        // 2.3 Extrair os dados da tabela
+        const rowDate = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(dayInfo.day).padStart(2, '0')}`;
+        const punchesDoDia: string[] = [];
+
+        $2('#Grid tr, table tr').each((index, element) => {
+          const textoLinha = $2(element).text().replace(/\s+/g, ' ').trim();
+          const matchesHorario = textoLinha.match(/([0-2]?\d:[0-5]\d)/g);
+          
+          if (matchesHorario) {
+            matchesHorario.forEach(h => {
+              let [hora, min] = h.split(':');
+              const hFormatada = `${hora.padStart(2, '0')}:${min}`;
+              if (!punchesDoDia.includes(hFormatada)) punchesDoDia.push(hFormatada);
+            });
+          }
+        });
+
+        if (punchesDoDia.length > 0) {
+          mapaMarcacoes.set(rowDate, punchesDoDia);
+        }
+      } catch (err) {
+        console.error(`Erro ao buscar dia ${dayInfo.day}:`, err);
+      }
+    };
+
+    // Executar em lotes (batches) de 5 para não sobrecarregar
+    const batchSize = 5;
+    for (let i = 0; i < daysToFetch.length; i += batchSize) {
+      const batch = daysToFetch.slice(i, i + batchSize);
+      await Promise.all(batch.map(dayInfo => fetchDay(dayInfo)));
+    }
 
     // 4. Transformar e Guardar no Neon DB
     
@@ -195,7 +245,6 @@ export async function onRequestPost(context: any) {
       return Response.json({ 
         success: true, 
         count: savedCount, 
-        debugHtml: finalHtml.substring(0, 1000),
         dbErrors: dbErrors.slice(0, 5) // Return first 5 errors to avoid huge payloads
       });
     }
