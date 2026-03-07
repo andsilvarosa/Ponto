@@ -39,6 +39,8 @@ export async function onRequestPost(context: any) {
     const user = userResult.rows[0];
 
     step = "compare_password";
+    // bcrypt.compare is also CPU intensive, but we have no choice here.
+    // Ensure we are using the same library and it's as fast as possible.
     const isPasswordValid = await bcrypt.compare(password, user.password as string);
     if (!isPasswordValid) {
       return Response.json({ error: "Senha incorreta" }, { status: 401 });

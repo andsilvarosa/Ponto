@@ -30,15 +30,25 @@ export async function onRequestPost(context: any) {
       return Response.json({ error: "Matrícula e senha são obrigatórios" }, { status: 400 });
     }
 
+    step = "ensure_table";
+    await db.execute(sql`
+      CREATE TABLE IF NOT EXISTS users (
+        matricula TEXT PRIMARY KEY,
+        password TEXT NOT NULL,
+        name TEXT,
+        created_at TIMESTAMP DEFAULT NOW()
+      )
+    `);
+
     step = "check_user_exists";
-    // We'll use a raw query to avoid any drizzle-related issues for now
     const existingUserResult = await db.execute(sql`SELECT matricula FROM users WHERE matricula = ${matricula} LIMIT 1`);
     if (existingUserResult.rows.length > 0) {
       return Response.json({ error: "Usuário já cadastrado" }, { status: 400 });
     }
 
     step = "hash_password";
-    const hashedPassword = await bcrypt.hash(password, 10);
+    // Reduced rounds to 4 to fit Cloudflare Worker CPU limits (50ms)
+    const hashedPassword = await bcrypt.hash(password, 4);
 
     step = "insert_user";
     await db.execute(sql`
