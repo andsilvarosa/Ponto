@@ -201,40 +201,69 @@ export async function onRequestPost(context: any) {
     }
 
     // Corrigir marcações de virada de noite (overnight shifts)
+    // 1. Ordenar as marcações de cada dia primeiro
+    for (const [date, punches] of mapaMarcacoes.entries()) {
+      punches.sort();
+    }
+
     const sortedDates = Array.from(mapaMarcacoes.keys()).sort();
-    for (let i = 0; i < sortedDates.length - 1; i++) {
+    
+    for (let i = 0; i < sortedDates.length; i++) {
       const currentDate = sortedDates[i];
-      const nextDate = sortedDates[i + 1];
+      const currentPunches = mapaMarcacoes.get(currentDate)!;
       
-      const currentPunches = mapaMarcacoes.get(currentDate);
-      const nextPunches = mapaMarcacoes.get(nextDate);
+      if (currentPunches.length === 0) continue;
       
-      if (currentPunches && nextPunches && currentPunches.length % 2 !== 0) {
-        // Verifica se nextDate é exatamente o dia seguinte
-        const curr = new Date(currentDate);
-        const next = new Date(nextDate);
-        const diffTime = Math.abs(next.getTime() - curr.getTime());
-        const diffDays = Math.round(diffTime / (1000 * 60 * 60 * 24));
+      const firstPunch = currentPunches[0];
+      
+      // Se a primeira marcação for de madrugada/manhã (antes das 09:00)
+      if (firstPunch < '09:00') {
+        const currDateObj = new Date(currentDate);
+        currDateObj.setDate(currDateObj.getDate() - 1);
+        const prevDateStr = `${currDateObj.getFullYear()}-${String(currDateObj.getMonth() + 1).padStart(2, '0')}-${String(currDateObj.getDate()).padStart(2, '0')}`;
         
-        if (diffDays === 1 && nextPunches.length > 0) {
-          // Ordena as marcações do dia seguinte para pegar a primeira (mais cedo)
-          nextPunches.sort();
-          const firstPunchNextDay = nextPunches[0];
-          const lastPunchCurrentDay = currentPunches[currentPunches.length - 1];
-          
-          // Só move para o dia anterior se:
-          // 1. A marcação do dia seguinte for de madrugada/manhã (antes das 12:00)
-          // 2. A última marcação do dia atual for à tarde/noite (depois das 12:00)
-          // Isso evita puxar a entrada do próximo turno caso o funcionário tenha esquecido de bater a saída de um turno diurno
-          if (firstPunchNextDay && firstPunchNextDay < '12:00' && lastPunchCurrentDay >= '12:00') {
-            nextPunches.shift(); // Remove do dia seguinte
-            currentPunches.push(firstPunchNextDay); // Adiciona no dia atual
-            
-            // Atualiza o mapa. Não deletamos o nextDate mesmo se ficar vazio,
-            // para que o banco de dados seja atualizado com valores nulos (limpando o dia).
-            mapaMarcacoes.set(currentDate, currentPunches);
-            mapaMarcacoes.set(nextDate, nextPunches);
+        let isOrphaned = false;
+        
+        // Se tem mais de uma marcação, o gap para a próxima deve ser grande (ex: > 6 horas)
+        // Isso garante que não vamos puxar uma entrada normal da manhã (ex: 08:00) 
+        // só porque o dia anterior esqueceu de bater a saída.
+        let hasLargeGap = true;
+        if (currentPunches.length > 1) {
+          const secondPunch = currentPunches[1];
+          const p1 = firstPunch.split(':');
+          const p2 = secondPunch.split(':');
+          const m1 = parseInt(p1[0], 10) * 60 + parseInt(p1[1], 10);
+          const m2 = parseInt(p2[0], 10) * 60 + parseInt(p2[1], 10);
+          if (m2 - m1 <= 360) { // 6 horas
+            hasLargeGap = false;
           }
+        }
+
+        if (hasLargeGap) {
+          if (mapaMarcacoes.has(prevDateStr)) {
+            const prevPunches = mapaMarcacoes.get(prevDateStr)!;
+            // Se o dia anterior tem número ímpar de marcações e a última foi à tarde/noite
+            if (prevPunches.length % 2 !== 0 && prevPunches[prevPunches.length - 1] >= '12:00') {
+              isOrphaned = true;
+            }
+          } else {
+            // Se não temos o dia anterior no mapa (ex: dia 1 do mês), assumimos que é órfã
+            isOrphaned = true;
+          }
+        }
+        
+        if (isOrphaned) {
+          const orphanedPunch = currentPunches.shift()!;
+          
+          if (mapaMarcacoes.has(prevDateStr)) {
+            const prevPunches = mapaMarcacoes.get(prevDateStr)!;
+            prevPunches.push(orphanedPunch);
+            mapaMarcacoes.set(prevDateStr, prevPunches);
+          } else {
+            mapaMarcacoes.set(prevDateStr, [orphanedPunch]);
+          }
+          
+          mapaMarcacoes.set(currentDate, currentPunches);
         }
       }
     }
