@@ -39,24 +39,6 @@ export async function onRequestGet(context: any) {
     }
 
     try {
-      logs.push("Reiniciando tabela de usuários (DROP e CREATE)...");
-      // Como o usuário está tendo erro 500 e a tabela parece corrompida/incompleta, 
-      // vamos recomeçar para garantir que as colunas existam exatamente como o Drizzle espera.
-      await db.execute(sql`DROP TABLE IF EXISTS users`);
-      await db.execute(sql`
-        CREATE TABLE users (
-          matricula TEXT PRIMARY KEY,
-          password TEXT NOT NULL,
-          name TEXT,
-          created_at TIMESTAMP DEFAULT NOW()
-        )
-      `);
-      logs.push("Tabela de usuários recriada com sucesso.");
-    } catch (e: any) {
-      logs.push("Erro ao recriar tabela de usuários: " + e.message);
-    }
-
-    try {
       logs.push("Limpando dados e ajustando índices...");
       await db.execute(sql`UPDATE time_entries SET matricula = '000000' WHERE matricula IS NULL`);
       await db.execute(sql`ALTER TABLE time_entries ALTER COLUMN matricula SET NOT NULL`);

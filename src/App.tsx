@@ -75,10 +75,6 @@ export default function App() {
   const [loading, setLoading] = useState(true);
   const [isSyncingCompany, setIsSyncingCompany] = useState(false);
   const [theme, setTheme] = useState<'dark' | 'light'>('dark');
-  const [password, setPassword] = useState('');
-  const [isRegistering, setIsRegistering] = useState(false);
-  const [authError, setAuthError] = useState('');
-  const [authLoading, setAuthLoading] = useState(false);
 
   useEffect(() => {
     if (theme === 'dark') {
@@ -342,56 +338,11 @@ export default function App() {
 
   const stats = calculateStats();
 
-  const handleLogin = async (e: React.FormEvent) => {
+  const handleLogin = (e: React.FormEvent) => {
     e.preventDefault();
-    setAuthError('');
-    setAuthLoading(true);
-    try {
-      const response = await fetch('/api/auth/login', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ matricula: matricula.trim(), password }),
-      });
-      
-      const data = await response.json();
-      if (!response.ok) {
-        const errorMsg = data.details ? `${data.error} (Step: ${data.step}): ${data.details}` : (data.error || 'Erro ao realizar login');
-        throw new Error(errorMsg);
-      }
-
+    if (matricula.trim().length > 0) {
       localStorage.setItem('matricula', matricula.trim());
       setIsLoggedIn(true);
-    } catch (err: any) {
-      setAuthError(err.message);
-    } finally {
-      setAuthLoading(false);
-    }
-  };
-
-  const handleRegister = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setAuthError('');
-    setAuthLoading(true);
-    try {
-      const response = await fetch('/api/auth/register', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ matricula: matricula.trim(), password }),
-      });
-      
-      const data = await response.json();
-      if (!response.ok) {
-        const errorMsg = data.details ? `${data.error} (Step: ${data.step}): ${data.details}` : (data.error || 'Erro ao cadastrar');
-        throw new Error(errorMsg);
-      }
-
-      alert('Cadastro realizado com sucesso! Agora você pode entrar.');
-      setIsRegistering(false);
-      setPassword('');
-    } catch (err: any) {
-      setAuthError(err.message);
-    } finally {
-      setAuthLoading(false);
     }
   };
 
@@ -408,19 +359,10 @@ export default function App() {
               <Clock className="text-black w-8 h-8" />
             </div>
             <h1 className="text-2xl font-bold text-zinc-900 dark:text-zinc-100">Ponto CLT</h1>
-            <p className="text-zinc-500 dark:text-zinc-400 text-sm mt-2">
-              {isRegistering ? 'Crie sua conta para começar' : 'Digite sua matrícula e senha para acessar'}
-            </p>
+            <p className="text-zinc-500 dark:text-zinc-400 text-sm mt-2">Digite sua matrícula para acessar</p>
           </div>
 
-          <form onSubmit={isRegistering ? handleRegister : handleLogin} className="space-y-6">
-            {authError && (
-              <div className="bg-rose-500/10 border border-rose-500/20 text-rose-500 px-4 py-3 rounded-2xl text-sm flex items-center gap-2">
-                <AlertCircle className="w-4 h-4" />
-                {authError}
-              </div>
-            )}
-            
+          <form onSubmit={handleLogin} className="space-y-6">
             <div className="space-y-2">
               <label className="text-xs font-bold text-zinc-500 dark:text-zinc-500 uppercase tracking-widest">Matrícula</label>
               <input 
@@ -432,39 +374,12 @@ export default function App() {
                 className="w-full bg-black/5 dark:bg-white/5 border border-black/10 dark:border-white/10 rounded-2xl px-4 py-3 focus:outline-none focus:border-emerald-500/50 transition-colors text-black dark:text-white"
               />
             </div>
-
-            <div className="space-y-2">
-              <label className="text-xs font-bold text-zinc-500 dark:text-zinc-500 uppercase tracking-widest">Senha</label>
-              <input 
-                type="password" 
-                required
-                value={password}
-                onChange={e => setPassword(e.target.value)}
-                placeholder="••••••••"
-                className="w-full bg-black/5 dark:bg-white/5 border border-black/10 dark:border-white/10 rounded-2xl px-4 py-3 focus:outline-none focus:border-emerald-500/50 transition-colors text-black dark:text-white"
-              />
-            </div>
-
             <button 
               type="submit"
-              disabled={authLoading}
-              className="w-full bg-emerald-500 hover:bg-emerald-400 text-black px-6 py-4 rounded-2xl font-bold transition-all shadow-lg shadow-emerald-500/20 disabled:opacity-50"
+              className="w-full bg-emerald-500 hover:bg-emerald-400 text-black px-6 py-4 rounded-2xl font-bold transition-all shadow-lg shadow-emerald-500/20"
             >
-              {authLoading ? 'Carregando...' : (isRegistering ? 'Cadastrar' : 'Acessar')}
+              Acessar
             </button>
-
-            <div className="text-center">
-              <button 
-                type="button"
-                onClick={() => {
-                  setIsRegistering(!isRegistering);
-                  setAuthError('');
-                }}
-                className="text-sm text-zinc-500 hover:text-emerald-500 transition-colors"
-              >
-                {isRegistering ? 'Já tem uma conta? Entre aqui' : 'Não tem uma conta? Cadastre-se'}
-              </button>
-            </div>
           </form>
         </motion.div>
       </div>
