@@ -30,6 +30,14 @@ async function ensureTableExists(db: any) {
     try {
       await db.execute(sql`ALTER TABLE time_entries DROP CONSTRAINT IF EXISTS time_entries_pkey`);
       await db.execute(sql`ALTER TABLE time_entries DROP CONSTRAINT IF EXISTS time_entries_date_unique`);
+      await db.execute(sql`ALTER TABLE time_entries DROP CONSTRAINT IF EXISTS time_entries_matricula_date_pk`);
+      
+      // Remove duplicates before adding primary key
+      await db.execute(sql`
+        DELETE FROM time_entries a USING time_entries b
+        WHERE a.matricula = b.matricula AND a.date = b.date AND a.ctid > b.ctid
+      `);
+      
       await db.execute(sql`ALTER TABLE time_entries ADD PRIMARY KEY (matricula, date)`);
     } catch (e) {}
   } catch (e: any) {

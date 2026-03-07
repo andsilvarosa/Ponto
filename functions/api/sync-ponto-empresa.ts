@@ -183,18 +183,23 @@ export async function onRequestPost(context: any) {
       
       // Drop old primary key and add new composite primary key
       try {
+        console.log("Tentando ajustar constraints da tabela time_entries...");
         await db.execute(sql`ALTER TABLE time_entries DROP CONSTRAINT IF EXISTS time_entries_pkey`);
         await db.execute(sql`ALTER TABLE time_entries DROP CONSTRAINT IF EXISTS time_entries_date_unique`);
+        await db.execute(sql`ALTER TABLE time_entries DROP CONSTRAINT IF EXISTS time_entries_matricula_date_pk`);
         
         // Remove duplicates before adding primary key
+        console.log("Removendo duplicatas...");
         await db.execute(sql`
           DELETE FROM time_entries a USING time_entries b
           WHERE a.matricula = b.matricula AND a.date = b.date AND a.ctid > b.ctid
         `);
         
+        console.log("Adicionando nova PRIMARY KEY (matricula, date)...");
         await db.execute(sql`ALTER TABLE time_entries ADD PRIMARY KEY (matricula, date)`);
-      } catch (e) {
-        console.error("Erro ao recriar primary key:", e);
+        console.log("PRIMARY KEY adicionada com sucesso.");
+      } catch (e: any) {
+        console.error("Erro ao recriar primary key:", e.message);
       }
     } catch (e: any) {
       console.error("Erro ao configurar tabela:", e);

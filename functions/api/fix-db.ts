@@ -39,22 +39,32 @@ export async function onRequestGet(context: any) {
     }
 
     try {
+      logs.push("Limpando constraints antigas...");
+      await db.execute(sql`ALTER TABLE time_entries DROP CONSTRAINT IF EXISTS time_entries_pkey`);
+      await db.execute(sql`ALTER TABLE time_entries DROP CONSTRAINT IF EXISTS time_entries_date_unique`);
+      await db.execute(sql`ALTER TABLE time_entries DROP CONSTRAINT IF EXISTS time_entries_matricula_date_pk`);
+      logs.push("Constraints antigas removidas.");
+    } catch (e: any) {
+      logs.push("Aviso ao remover constraints: " + e.message);
+    }
+
+    try {
+      logs.push("Removendo duplicatas (matricula + date)...");
       await db.execute(sql`
         DELETE FROM time_entries a USING time_entries b
         WHERE a.matricula = b.matricula AND a.date = b.date AND a.ctid > b.ctid
       `);
-      logs.push("DELETE duplicatas executado com sucesso.");
+      logs.push("Duplicatas removidas.");
     } catch (e: any) {
-      logs.push("Erro no DELETE duplicatas: " + e.message);
+      logs.push("Erro ao remover duplicatas: " + e.message);
     }
 
     try {
-      await db.execute(sql`ALTER TABLE time_entries DROP CONSTRAINT IF EXISTS time_entries_pkey`);
-      await db.execute(sql`ALTER TABLE time_entries DROP CONSTRAINT IF EXISTS time_entries_date_unique`);
+      logs.push("Adicionando PRIMARY KEY (matricula, date)...");
       await db.execute(sql`ALTER TABLE time_entries ADD PRIMARY KEY (matricula, date)`);
-      logs.push("ADD PRIMARY KEY executado com sucesso.");
+      logs.push("PRIMARY KEY adicionada com sucesso.");
     } catch (e: any) {
-      logs.push("Erro no ADD PRIMARY KEY: " + e.message);
+      logs.push("Erro ao adicionar PRIMARY KEY: " + e.message);
     }
 
     try {
