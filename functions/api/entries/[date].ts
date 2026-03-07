@@ -1,5 +1,5 @@
 import { timeEntries } from "../../../src/db/schema";
-import { eq } from "drizzle-orm";
+import { eq, and } from "drizzle-orm";
 import { neon } from '@neondatabase/serverless';
 import { drizzle } from 'drizzle-orm/neon-http';
 
@@ -9,7 +9,10 @@ export async function onRequestDelete(context: any) {
 
   try {
     const date = context.params.date;
-    await db.delete(timeEntries).where(eq(timeEntries.date, date));
+    const url = new URL(context.request.url);
+    const matricula = url.searchParams.get('matricula') || 'default';
+
+    await db.delete(timeEntries).where(and(eq(timeEntries.date, date), eq(timeEntries.matricula, matricula)));
     return Response.json({ success: true });
   } catch (error: any) {
     return Response.json({ error: "Erro ao deletar marcação", details: error.message }, { status: 500 });
