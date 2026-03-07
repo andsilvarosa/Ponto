@@ -3,6 +3,18 @@ import { eq, sql } from "drizzle-orm";
 import { neon } from '@neondatabase/serverless';
 import { drizzle } from 'drizzle-orm/neon-http';
 
+async function ensureTableExists(db: any) {
+  try {
+    await db.execute(sql`
+      CREATE TABLE IF NOT EXISTS settings (
+        key TEXT PRIMARY KEY,
+        value TEXT NOT NULL
+      )
+    `);
+    await db.execute(sql`ALTER TABLE settings ADD PRIMARY KEY (key)`);
+  } catch (e) {}
+}
+
 export async function onRequestGet(context: any) {
   const matricula = context.request.headers.get('x-matricula');
   if (!matricula) return Response.json({ error: "Matrícula não informada" }, { status: 400 });
@@ -11,15 +23,7 @@ export async function onRequestGet(context: any) {
   const db = drizzle(sqlClient);
 
   try {
-    try {
-      await db.execute(sql`
-        CREATE TABLE IF NOT EXISTS settings (
-          key TEXT PRIMARY KEY,
-          value TEXT NOT NULL
-        )
-      `);
-      await db.execute(sql`ALTER TABLE settings ADD PRIMARY KEY (key)`);
-    } catch (e) {}
+    await ensureTableExists(db);
 
     const allSettings = await db.select().from(settings).where(eq(settings.key, `${matricula}_previous_balance`));
     const settingsMap = allSettings.reduce((acc: any, curr: any) => {
@@ -42,15 +46,7 @@ export async function onRequestPost(context: any) {
   const db = drizzle(sqlClient);
 
   try {
-    try {
-      await db.execute(sql`
-        CREATE TABLE IF NOT EXISTS settings (
-          key TEXT PRIMARY KEY,
-          value TEXT NOT NULL
-        )
-      `);
-      await db.execute(sql`ALTER TABLE settings ADD PRIMARY KEY (key)`);
-    } catch (e) {}
+    await ensureTableExists(db);
 
     const { previous_balance } = await context.request.json();
     if (previous_balance !== undefined) {
